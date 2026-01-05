@@ -2,7 +2,7 @@ import { addMinutes, isBefore } from "date-fns";
 import { DEFAULT_SLOT_DURATION_MIN } from "@/lib/constants";
 import { Database } from "@/types/database";
 
-export type AppointmentRow = Database["public"]["Tables"]["appointments"]["Row"];
+export type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"];
 
 type BusinessHours = Record<string, [string, string][]>;
 

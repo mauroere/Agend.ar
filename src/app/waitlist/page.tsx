@@ -6,15 +6,15 @@ import { LocationSwitcher } from "@/components/location/LocationSwitcher";
 import { Database } from "@/types/database";
 import { requireTenantSession } from "@/server/auth";
 
-type WaitlistRow = Database["public"]["Tables"]["waitlist"]["Row"] & {
-  patients: Pick<Database["public"]["Tables"]["patients"]["Row"], "full_name" | "phone_e164" | "opt_out"> | null;
+type WaitlistRow = Database["public"]["Tables"]["agenda_waitlist"]["Row"] & {
+  agenda_patients: Pick<Database["public"]["Tables"]["agenda_patients"]["Row"], "full_name" | "phone_e164" | "opt_out"> | null;
 };
-type LocationRow = Pick<Database["public"]["Tables"]["locations"]["Row"], "id" | "name">;
+type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id" | "name">;
 
 export default async function WaitlistPage({ searchParams }: { searchParams: { location?: string } }) {
   const { supabase, tenantId } = await requireTenantSession();
   const { data: locationRows } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .select("id, name")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true });
@@ -24,8 +24,8 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { l
     ? searchParams.location
     : locations[0]?.id;
   const { data } = await supabase
-    .from("waitlist")
-    .select("id, tenant_id, location_id, patient_id, priority, active, patients:patient_id(full_name, phone_e164, opt_out)")
+    .from("agenda_waitlist")
+    .select("id, tenant_id, location_id, patient_id, priority, active, agenda_patients:patient_id(full_name, phone_e164, opt_out)")
     .eq("tenant_id", tenantId)
     .eq("location_id", activeLocationId ?? undefined)
     .eq("active", true)
@@ -36,9 +36,9 @@ export default async function WaitlistPage({ searchParams }: { searchParams: { l
     id: w.id,
     priority: w.priority,
     active: w.active,
-    patient: w.patients?.full_name ?? "Paciente",
-    phone: w.patients?.phone_e164 ?? "",
-    optOut: w.patients?.opt_out ?? false,
+    patient: w.agenda_patients?.full_name ?? "Paciente",
+    phone: w.agenda_patients?.phone_e164 ?? "",
+    optOut: w.agenda_patients?.opt_out ?? false,
   }));
 
   return (

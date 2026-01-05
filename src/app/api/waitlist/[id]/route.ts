@@ -17,12 +17,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const id = params.id;
   if (!id) return NextResponse.json({ error: "Missing waitlist id" }, { status: 400 });
 
-  const payload: Database["public"]["Tables"]["waitlist"]["Update"] = {
+  const payload: Database["public"]["Tables"]["agenda_waitlist"]["Update"] = {
     active: false,
   };
 
   const { error } = await supabase
-    .from("waitlist")
+    .from("agenda_waitlist")
     .update(payload)
     .eq("id", id)
     .eq("tenant_id", tenantId);

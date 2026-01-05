@@ -17,12 +17,12 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   const appointmentId = params.id;
   if (!appointmentId) return NextResponse.json({ error: "Missing appointment id" }, { status: 400 });
 
-  const payload: Database["public"]["Tables"]["appointments"]["Update"] = {
+  const payload: Database["public"]["Tables"]["agenda_appointments"]["Update"] = {
     status: "canceled",
   };
 
   const { error } = await supabase
-    .from("appointments")
+    .from("agenda_appointments")
     .update(payload)
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId);

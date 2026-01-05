@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  type LocationId = Pick<Database["public"]["Tables"]["locations"]["Row"], "id">;
+  type LocationId = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id">;
 
   const { data: location } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .select("id")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true })
@@ -35,13 +35,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No location found" }, { status: 404 });
   }
 
-  const payload: Database["public"]["Tables"]["locations"]["Update"] = {
+  const payload: Database["public"]["Tables"]["agenda_locations"]["Update"] = {
     default_duration: defaultDuration,
     buffer_minutes: bufferMinutes,
   };
 
   const { error } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .update(payload)
     .eq("id", location.id)
     .eq("tenant_id", tenantId);

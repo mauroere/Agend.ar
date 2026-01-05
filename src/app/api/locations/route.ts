@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .select("id, name, timezone, default_duration, buffer_minutes")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true });

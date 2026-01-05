@@ -5,9 +5,9 @@ import { isWithinBusinessHours } from "@/lib/scheduling";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { Database } from "@/types/database";
 
-type PatientRow = Database["public"]["Tables"]["patients"]["Row"];
-type LocationRow = Database["public"]["Tables"]["locations"]["Row"];
-type AppointmentInsert = Database["public"]["Tables"]["appointments"]["Insert"];
+type PatientRow = Database["public"]["Tables"]["agenda_patients"]["Row"];
+type LocationRow = Database["public"]["Tables"]["agenda_locations"]["Row"];
+type AppointmentInsert = Database["public"]["Tables"]["agenda_appointments"]["Insert"];
 
 export async function POST(request: NextRequest) {
   const supabase = getRouteSupabase() as unknown as SupabaseClient<Database>;
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   // Find or create patient
   const { data: existingPatient } = await supabase
-    .from("patients")
+    .from("agenda_patients")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("phone_e164", normalizedPhone)
@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
       full_name: patient,
       phone_e164: normalizedPhone,
       opt_out: false,
-    } satisfies Database["public"]["Tables"]["patients"]["Insert"];
+    } satisfies Database["public"]["Tables"]["agenda_patients"]["Insert"];
 
     const { data: inserted, error: patientError } = await supabase
-      .from("patients")
+      .from("agenda_patients")
       .insert(patientInsert)
       .select("id")
       .single();
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   if (location_id) {
     const { data: locationRow } = await supabase
-      .from("locations")
+      .from("agenda_locations")
       .select("id, timezone, buffer_minutes, business_hours")
       .eq("tenant_id", tenantId)
       .eq("id", location_id)
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   if (!locationId) {
     const { data: fallback } = await supabase
-      .from("locations")
+      .from("agenda_locations")
       .select("id, timezone, buffer_minutes, business_hours")
       .eq("tenant_id", tenantId)
       .order("name", { ascending: true })
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
   const conflictWindowEnd = addMinutes(endAt, bufferMinutes);
 
   const { data: conflicts, error: conflictError } = await supabase
-    .from("appointments")
+    .from("agenda_appointments")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("location_id", locationId)
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
   } satisfies AppointmentInsert;
 
   const { error: apptError, data: appt } = await supabase
-    .from("appointments")
+    .from("agenda_appointments")
     .insert(appointmentInsert)
     .select("id, start_at, end_at, status")
     .single();

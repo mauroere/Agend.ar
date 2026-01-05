@@ -4,8 +4,8 @@ import { Database } from "@/types/database";
 import { requireTenantSession } from "@/server/auth";
 import { getTenantId } from "@/server/tenant";
 
-type PatientRow = Database["public"]["Tables"]["patients"]["Row"];
-type AppointmentRow = Database["public"]["Tables"]["appointments"]["Row"];
+type PatientRow = Database["public"]["Tables"]["agenda_patients"]["Row"];
+type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"];
 
 export default async function PatientsPage() {
   const { supabase, tenantId } = await requireTenantSession();
@@ -13,13 +13,13 @@ export default async function PatientsPage() {
   const nowIso = new Date().toISOString();
   const [{ data: patients }, { data: upcoming }] = await Promise.all([
     supabase
-      .from("patients")
+      .from("agenda_patients")
       .select("id, full_name, phone_e164, opt_out")
       .eq("tenant_id", tenantId)
       .order("full_name", { ascending: true })
       .returns<PatientRow[]>(),
     supabase
-      .from("appointments")
+      .from("agenda_appointments")
       .select("id, patient_id, start_at, status")
       .eq("tenant_id", tenantId)
       .gte("start_at", nowIso)

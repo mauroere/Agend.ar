@@ -8,14 +8,14 @@ import { AutopilotSettings } from "@/components/settings/AutopilotSettings";
 import { requireTenantSession } from "@/server/auth";
 
 type LocationRow = Pick<
-  Database["public"]["Tables"]["locations"]["Row"],
+  Database["public"]["Tables"]["agenda_locations"]["Row"],
   "name" | "timezone" | "default_duration" | "buffer_minutes"
 >;
 
 export default async function SettingsPage() {
   const { supabase, tenantId } = await requireTenantSession();
   const { data: locations } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .select("name, timezone, default_duration, buffer_minutes")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true })

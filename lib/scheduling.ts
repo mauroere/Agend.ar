@@ -3,7 +3,7 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { APP_TIMEZONE, DEFAULT_SLOT_DURATION_MIN } from "@/lib/constants";
 import { Database } from "@/types/database";
 
-export type AppointmentRow = Database["public"]["Tables"]["appointments"]["Row"];
+export type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"];
 
 export function toLocal(date: string | Date) {
   return toZonedTime(date, APP_TIMEZONE);

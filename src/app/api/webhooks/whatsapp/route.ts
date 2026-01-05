@@ -27,7 +27,7 @@ async function logMessage({
 }) {
   if (!serviceClient) return;
 
-  await serviceClient.from("message_log").insert({
+  await serviceClient.from("agenda_message_log").insert({
     tenant_id: tenantId,
     patient_id: patientId,
     direction,
@@ -55,7 +55,7 @@ async function handleReply({
 
   if (normalized === "STOP") {
     await serviceClient
-      .from("patients")
+      .from("agenda_patients")
       .update({ opt_out: true, opt_out_at: new Date().toISOString() })
       .eq("id", patientId)
       .eq("tenant_id", tenantId);
@@ -76,7 +76,7 @@ async function handleReply({
 
   if (["1", "2", "3"].includes(normalized)) {
     const upcoming = await serviceClient
-      .from("appointments")
+      .from("agenda_appointments")
       .select("id, start_at, location_id")
       .eq("patient_id", patientId)
       .eq("tenant_id", tenantId)
@@ -89,7 +89,7 @@ async function handleReply({
 
     if (normalized === "1") {
       await serviceClient
-        .from("appointments")
+        .from("agenda_appointments")
         .update({ status: "confirmed" })
         .eq("id", appointment.id)
         .eq("tenant_id", tenantId);
@@ -98,7 +98,7 @@ async function handleReply({
 
     if (normalized === "3") {
       await serviceClient
-        .from("appointments")
+        .from("agenda_appointments")
         .update({ status: "canceled" })
         .eq("id", appointment.id)
         .eq("tenant_id", tenantId);
@@ -111,7 +111,7 @@ async function handleReply({
 
     if (normalized === "2") {
       await serviceClient
-        .from("appointments")
+        .from("agenda_appointments")
         .update({ status: "reschedule_requested" })
         .eq("id", appointment.id)
         .eq("tenant_id", tenantId);
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
 
         if (!serviceClient) continue;
         const { data: patient } = await serviceClient
-          .from("patients")
+          .from("agenda_patients")
           .select("id, tenant_id, opt_out")
           .eq("phone_e164", from)
           .eq("tenant_id", tenantId)

@@ -8,7 +8,7 @@ export async function runWaitlistJob() {
 
   const cutoff = addHours(new Date(), 48).toISOString();
   const { data: canceled } = await serviceClient
-    .from("appointments")
+    .from("agenda_appointments")
     .select("id, tenant_id, location_id, start_at")
     .eq("status", "canceled")
     .gte("updated_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
@@ -16,8 +16,8 @@ export async function runWaitlistJob() {
 
   for (const appt of canceled ?? []) {
     const { data: waiters } = await serviceClient
-      .from("waitlist")
-      .select("id, patient_id, priority, patients:patient_id(id, full_name, phone_e164, opt_out)")
+      .from("agenda_waitlist")
+      .select("id, patient_id, priority, agenda_patients:patient_id(id, full_name, phone_e164, opt_out)")
       .eq("location_id", appt.location_id)
       .eq("tenant_id", appt.tenant_id)
       .eq("active", true)
@@ -25,7 +25,7 @@ export async function runWaitlistJob() {
       .limit(10);
 
     for (const w of waiters ?? []) {
-      const patient = (w as any).patients;
+      const patient = (w as any).agenda_patients;
       if (!patient || patient.opt_out) continue;
 
       await sendTemplateMessage({
@@ -37,7 +37,7 @@ export async function runWaitlistJob() {
         ],
       });
 
-      await serviceClient.from("message_log").insert({
+      await serviceClient.from("agenda_message_log").insert({
         tenant_id: appt.tenant_id,
         patient_id: patient.id,
         appointment_id: appt.id,

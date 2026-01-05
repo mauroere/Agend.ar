@@ -5,9 +5,9 @@ import { TEMPLATE_NAMES } from "@/lib/messages";
 import { logError, logInfo } from "@/lib/logging";
 import { Database } from "@/types/database";
 
-type ReminderAppointment = Database["public"]["Tables"]["appointments"]["Row"] & {
-  patients: Pick<
-    Database["public"]["Tables"]["patients"]["Row"],
+type ReminderAppointment = Database["public"]["Tables"]["agenda_appointments"]["Row"] & {
+  agenda_patients: Pick<
+    Database["public"]["Tables"]["agenda_patients"]["Row"],
     "id" | "full_name" | "phone_e164" | "opt_out"
   > | null;
 };
@@ -19,8 +19,8 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
   const windowEnd = addHours(now, hoursAhead + 0.25);
 
   const { data: appointments, error } = await serviceClient
-    .from("appointments")
-    .select("id, tenant_id, patient_id, start_at, status, patients:patient_id(full_name, phone_e164, opt_out)")
+    .from("agenda_appointments")
+    .select("id, tenant_id, patient_id, start_at, status, agenda_patients:patient_id(full_name, phone_e164, opt_out)")
     .eq("status", "confirmed")
     .gte("start_at", windowStart.toISOString())
     .lte("start_at", windowEnd.toISOString())
@@ -30,7 +30,7 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
   logInfo("reminder.fetched", { job: "reminder", payload: { hoursAhead, count: appointments?.length ?? 0 } });
 
   for (const appt of appointments ?? []) {
-    const patient = appt.patients;
+    const patient = appt.agenda_patients;
     if (!patient || patient.opt_out) continue;
 
     const minutesLeft = differenceInMinutes(new Date(appt.start_at), now);
@@ -46,7 +46,7 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
       });
 
       await serviceClient
-        .from("message_log")
+        .from("agenda_message_log")
         .insert({
           tenant_id: appt.tenant_id,
           patient_id: appt.patient_id,

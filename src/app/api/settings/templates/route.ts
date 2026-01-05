@@ -3,7 +3,7 @@ import { TEMPLATE_NAMES, templatePreview } from "@/lib/messages";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { Database } from "@/types/database";
 
-type TemplateRow = Database["public"]["Tables"]["message_templates"]["Row"];
+type TemplateRow = Database["public"]["Tables"]["agenda_message_templates"]["Row"];
 
 const allowedNames = Object.values(TEMPLATE_NAMES) as string[];
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid template content" }, { status: 400 });
     }
     const { data: existing } = await supabase
-      .from("message_templates")
+      .from("agenda_message_templates")
       .select("id")
       .eq("tenant_id", tenantId)
       .eq("name", tpl.name)
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       } satisfies Partial<TemplateRow>;
 
       const { error } = await supabase
-        .from("message_templates")
+        .from("agenda_message_templates")
         .update(updatePayload)
         .eq("id", existingId)
         .eq("tenant_id", tenantId);
@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
         content: tpl.content,
         status: tpl.status ?? "active",
         meta_template_name: tpl.meta_template_name ?? null,
-      } satisfies Database["public"]["Tables"]["message_templates"]["Insert"];
+      } satisfies Database["public"]["Tables"]["agenda_message_templates"]["Insert"];
 
-      const { error } = await supabase.from("message_templates").insert(insertPayload);
+      const { error } = await supabase.from("agenda_message_templates").insert(insertPayload);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     }
   }
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from("message_templates")
+    .from("agenda_message_templates")
     .select("name, content, status, meta_template_name")
     .eq("tenant_id", tenantId);
 

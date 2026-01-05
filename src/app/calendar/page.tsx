@@ -6,8 +6,8 @@ import { APPOINTMENT_STATUS, AppointmentStatus } from "@/lib/constants";
 import { Database } from "@/types/database";
 import { requireTenantSession } from "@/server/auth";
 
-type CalendarRow = Database["public"]["Tables"]["appointments"]["Row"] & {
-  patients: Pick<Database["public"]["Tables"]["patients"]["Row"], "full_name" | "phone_e164"> | null;
+type CalendarRow = Database["public"]["Tables"]["agenda_appointments"]["Row"] & {
+  agenda_patients: Pick<Database["public"]["Tables"]["agenda_patients"]["Row"], "full_name" | "phone_e164"> | null;
 };
 
 function asAppointmentStatus(value: string): AppointmentStatus {
@@ -25,10 +25,10 @@ function toMinutes(startAt: string, endAt: string) {
 
 export default async function CalendarPage({ searchParams }: { searchParams: { location?: string } }) {
   const { supabase, tenantId } = await requireTenantSession();
-  type LocationRow = Pick<Database["public"]["Tables"]["locations"]["Row"], "id" | "name">;
+  type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id" | "name">;
 
   const { data: locationRows } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .select("id, name")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true })
@@ -39,8 +39,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     ? searchParams.location
     : locations[0]?.id;
   let appointmentQuery = supabase
-    .from("appointments")
-    .select("id, start_at, end_at, status, location_id, service_name, internal_notes, patients:patient_id(full_name, phone_e164)")
+    .from("agenda_appointments")
+    .select("id, start_at, end_at, status, location_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)")
     .eq("tenant_id", tenantId);
 
   if (activeLocationId) {
@@ -57,9 +57,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     id: appt.id,
     start: new Date(appt.start_at),
     durationMinutes: toMinutes(appt.start_at, appt.end_at),
-    patient: appt.patients?.full_name ?? "Paciente",
+    patient: appt.agenda_patients?.full_name ?? "Paciente",
     status: asAppointmentStatus(appt.status),
-    phone: appt.patients?.phone_e164 ?? "",
+    phone: appt.agenda_patients?.phone_e164 ?? "",
     locationId: appt.location_id ?? undefined,
     service: appt.service_name ?? "",
     notes: appt.internal_notes ?? "",

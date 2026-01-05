@@ -197,40 +197,52 @@ export interface Database {
         Update: PatientsUpdate;
         Relationships: [];
       };
-      locations: {
+      agenda_locations: {
         Row: LocationsRow;
         Insert: LocationsInsert;
         Update: LocationsUpdate;
         Relationships: [];
       };
-      message_log: {
+      agenda_message_log: {
         Row: MessageLogRow;
         Insert: MessageLogInsert;
         Update: MessageLogUpdate;
         Relationships: [];
       };
-      message_templates: {
+      agenda_message_templates: {
         Row: MessageTemplatesRow;
         Insert: MessageTemplatesInsert;
         Update: MessageTemplatesUpdate;
         Relationships: [];
       };
-      waitlist: {
+      agenda_waitlist: {
         Row: WaitlistRow;
         Insert: WaitlistInsert;
         Update: WaitlistUpdate;
         Relationships: [];
       };
-      tenants: {
+      agenda_tenants: {
         Row: TenantsRow;
         Insert: TenantsInsert;
         Update: TenantsUpdate;
         Relationships: [];
       };
-      users: {
+      agenda_users: {
         Row: UsersRow;
         Insert: UsersInsert;
         Update: UsersUpdate;
+        Relationships: [];
+      };
+      agenda_patients: {
+        Row: PatientsRow;
+        Insert: PatientsInsert;
+        Update: PatientsUpdate;
+        Relationships: [];
+      };
+      agenda_appointments: {
+        Row: AppointmentsRow;
+        Insert: AppointmentsInsert;
+        Update: AppointmentsUpdate;
         Relationships: [];
       };
     };

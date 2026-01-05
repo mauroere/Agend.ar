@@ -5,10 +5,10 @@ import { isWithinBusinessHours } from "@/lib/scheduling";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { Database } from "@/types/database";
 
-type AppointmentRow = Database["public"]["Tables"]["appointments"]["Row"];
-type AppointmentUpdate = Database["public"]["Tables"]["appointments"]["Update"];
-type PatientRow = Database["public"]["Tables"]["patients"]["Row"];
-type LocationRow = Database["public"]["Tables"]["locations"]["Row"];
+type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"];
+type AppointmentUpdate = Database["public"]["Tables"]["agenda_appointments"]["Update"];
+type PatientRow = Database["public"]["Tables"]["agenda_patients"]["Row"];
+type LocationRow = Database["public"]["Tables"]["agenda_locations"]["Row"];
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = getRouteSupabase() as unknown as SupabaseClient<Database>;
@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const { data: existingAppt, error: fetchError } = await supabase
-    .from("appointments")
+    .from("agenda_appointments")
     .select("id, tenant_id, location_id, start_at, end_at, status, patient_id")
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId)
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
 
   const { data: existingPatient } = await supabase
-    .from("patients")
+    .from("agenda_patients")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("phone_e164", normalizedPhone)
@@ -81,17 +81,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       full_name: patient,
       phone_e164: normalizedPhone,
       opt_out: false,
-    } satisfies Database["public"]["Tables"]["patients"]["Insert"];
+    } satisfies Database["public"]["Tables"]["agenda_patients"]["Insert"];
 
     const { data: inserted, error: patientError } = await supabase
-      .from("patients")
+      .from("agenda_patients")
       .insert(patientInsert)
       .select("id")
       .single();
     if (patientError) return NextResponse.json({ error: patientError.message }, { status: 400 });
     patientId = (inserted as Pick<PatientRow, "id">).id;
   } else {
-    await supabase.from("patients").update({ full_name: patient }).eq("id", patientId).eq("tenant_id", tenantId);
+    await supabase.from("agenda_patients").update({ full_name: patient }).eq("id", patientId).eq("tenant_id", tenantId);
   }
 
   let locationId: string | null = location_id ?? typedExisting.location_id ?? null;
@@ -101,7 +101,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (locationId) {
     const { data: locationRow } = await supabase
-      .from("locations")
+      .from("agenda_locations")
       .select("id, timezone, buffer_minutes, business_hours")
       .eq("tenant_id", tenantId)
       .eq("id", locationId)
@@ -118,7 +118,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (!locationId) {
     const { data: fallback } = await supabase
-      .from("locations")
+      .from("agenda_locations")
       .select("id, timezone, buffer_minutes, business_hours")
       .eq("tenant_id", tenantId)
       .order("name", { ascending: true })
@@ -154,7 +154,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const conflictWindowEnd = addMinutes(endAt, bufferMinutes);
 
   const { data: conflicts, error: conflictError } = await supabase
-    .from("appointments")
+    .from("agenda_appointments")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("location_id", locationId)
@@ -179,7 +179,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   } satisfies AppointmentUpdate;
 
   const { error: updateError, data: updated } = await supabase
-    .from("appointments")
+    .from("agenda_appointments")
     .update(updatePayload)
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId)

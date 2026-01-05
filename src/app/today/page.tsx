@@ -5,15 +5,15 @@ import { LocationSwitcher } from "@/components/location/LocationSwitcher";
 import { Database } from "@/types/database";
 import { requireTenantSession } from "@/server/auth";
 
-type AppointmentRow = Database["public"]["Tables"]["appointments"]["Row"] & {
-  patients: Pick<Database["public"]["Tables"]["patients"]["Row"], "full_name"> | null;
+type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"] & {
+  agenda_patients: Pick<Database["public"]["Tables"]["agenda_patients"]["Row"], "full_name"> | null;
 };
-type LocationRow = Pick<Database["public"]["Tables"]["locations"]["Row"], "id" | "name">;
+type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id" | "name">;
 
 export default async function TodayPage({ searchParams }: { searchParams: { location?: string } }) {
   const { supabase, tenantId } = await requireTenantSession();
   const { data: locationRows } = await supabase
-    .from("locations")
+    .from("agenda_locations")
     .select("id, name")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true });
@@ -26,8 +26,8 @@ export default async function TodayPage({ searchParams }: { searchParams: { loca
   const end = endOfDay(new Date()).toISOString();
 
   const { data } = await supabase
-    .from("appointments")
-    .select("id, start_at, status, patients:patient_id(full_name)")
+    .from("agenda_appointments")
+    .select("id, start_at, status, agenda_patients:patient_id(full_name)")
     .eq("tenant_id", tenantId)
     .eq("location_id", activeLocationId ?? undefined)
     .gte("start_at", start)
@@ -44,7 +44,7 @@ export default async function TodayPage({ searchParams }: { searchParams: { loca
     const action: "confirm" | "cancel" = status === "confirmed" ? "cancel" : "confirm";
     return {
       id: appt.id,
-      patient: appt.patients?.full_name ?? "Paciente",
+      patient: appt.agenda_patients?.full_name ?? "Paciente",
       time: format(new Date(appt.start_at), "HH:mm"),
       status,
       action,

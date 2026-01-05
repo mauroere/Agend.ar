@@ -30,13 +30,13 @@ export async function POST(request: NextRequest) {
   const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
 
   const { data: patientRow } = await supabase
-    .from("patients")
+    .from("agenda_patients")
     .select("id, opt_out")
     .eq("tenant_id", tenantId)
     .eq("phone_e164", normalizedPhone)
     .maybeSingle();
 
-  const typedPatient = patientRow as Pick<Database["public"]["Tables"]["patients"]["Row"], "id" | "opt_out"> | null;
+  const typedPatient = patientRow as Pick<Database["public"]["Tables"]["agenda_patients"]["Row"], "id" | "opt_out"> | null;
 
   if (typedPatient?.opt_out) {
     return NextResponse.json({ error: "Patient opted out" }, { status: 400 });
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   let patientId = typedPatient?.id;
   if (!patientId) {
     const { data: inserted, error: patientError } = await supabase
-      .from("patients")
+      .from("agenda_patients")
       .insert({ tenant_id: tenantId, full_name: patient, phone_e164: normalizedPhone, opt_out: false })
       .select("id")
       .single();
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   let locationId: string | null = null;
   if (location_id) {
     const { data: loc } = await supabase
-      .from("locations")
+      .from("agenda_locations")
       .select("id")
       .eq("tenant_id", tenantId)
       .eq("id", location_id)
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
   if (!locationId) {
     const { data: loc } = await supabase
-      .from("locations")
+      .from("agenda_locations")
       .select("id")
       .eq("tenant_id", tenantId)
       .order("name", { ascending: true })
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { error } = await supabase
-    .from("waitlist")
+    .from("agenda_waitlist")
     .insert({ tenant_id: tenantId, location_id: locationId, patient_id: patientId, priority, active: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
