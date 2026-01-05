@@ -23,6 +23,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
 
   const { error } = await supabase
     .from("agenda_appointments")
+    // @ts-ignore
     .update(payload)
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId);

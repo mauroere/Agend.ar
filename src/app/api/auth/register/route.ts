@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     password,
     email_confirm: true,
     user_metadata: { tenant_id: tenantId },
+    app_metadata: { tenant_id: tenantId },
   });
 
   if (userError || !userResult.user) {

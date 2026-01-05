@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Shell } from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <Shell>
+    <Shell hideNav>
       <div className="flex justify-center">
         <Card className="w-full max-w-md">
           <p className="text-sm uppercase tracking-[0.4em] text-slate-400">Crear cuenta</p>
@@ -81,6 +82,12 @@ export default function RegisterPage() {
             <Button className="w-full" disabled={loading}>
               {loading ? "Creando..." : "Crear cuenta"}
             </Button>
+            <p className="text-center text-sm text-slate-500">
+              ¿Ya tenés cuenta?{" "}
+              <Link href="/login" className="font-medium text-brand-600 hover:underline">
+                Ingresá
+              </Link>
+            </p>
           </form>
         </Card>
       </div>

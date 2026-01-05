@@ -38,6 +38,18 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
       continue;
     }
 
+    // Idempotency check
+    const { data: existingLog } = await serviceClient
+      .from("agenda_message_log")
+      .select("id")
+      .eq("appointment_id", appt.id)
+      .eq("type", hoursAhead === 24 ? TEMPLATE_NAMES.reminder24h : TEMPLATE_NAMES.reminder2h)
+      .maybeSingle();
+
+    if (existingLog) {
+      continue;
+    }
+
     try {
       await sendTemplateMessage({
         to: patient.phone_e164,

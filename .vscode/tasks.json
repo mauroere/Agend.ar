@@ -720,6 +720,142 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "cleanup-root",
+			"type": "shell",
+			"command": "Remove-Item -Recurse -Force app, components, lib, types; Move-Item middleware.ts src/middleware.ts",
+			"args": [],
+			"isBackground": false,
+			"group": "clean"
+		},
+		{
+			"label": "typecheck",
+			"type": "shell",
+			"command": "npx tsc",
+			"args": [
+				"--noEmit"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck-2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck-3",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck-4",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck-final",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck-final-2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "clean-next-cache",
+			"type": "shell",
+			"command": "Remove-Item -Recurse -Force .next, tsconfig.tsbuildinfo",
+			"args": [],
+			"isBackground": false,
+			"group": "clean"
+		},
+		{
+			"label": "npm-typecheck-users",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm-typecheck-users-2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "typecheck-audit",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "typecheck-audit-2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }

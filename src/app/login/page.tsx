@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Shell } from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
@@ -26,11 +27,12 @@ export default function LoginPage() {
       setError(signInError.message);
       return;
     }
+    router.refresh();
     router.push("/today");
   }
 
   return (
-    <Shell>
+    <Shell hideNav>
       <div className="flex justify-center">
         <Card className="w-full max-w-md">
           <p className="text-sm uppercase tracking-[0.4em] text-slate-400">Acceso</p>
@@ -48,6 +50,12 @@ export default function LoginPage() {
             <Button className="w-full" disabled={loading}>
               {loading ? "Ingresando..." : "Entrar"}
             </Button>
+            <p className="text-center text-sm text-slate-500">
+              ¿No tenés cuenta?{" "}
+              <Link href="/register" className="font-medium text-brand-600 hover:underline">
+                Registrate
+              </Link>
+            </p>
           </form>
         </Card>
       </div>

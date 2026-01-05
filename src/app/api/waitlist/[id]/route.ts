@@ -23,6 +23,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const { error } = await supabase
     .from("agenda_waitlist")
+    // @ts-ignore
     .update(payload)
     .eq("id", id)
     .eq("tenant_id", tenantId);

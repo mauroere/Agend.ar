@@ -4,6 +4,9 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { isWithinBusinessHours } from "@/lib/scheduling";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { Database } from "@/types/database";
+import { sendTemplateMessage } from "@/lib/whatsapp";
+import { TEMPLATE_NAMES } from "@/lib/messages";
+import { logError, logInfo } from "@/lib/logging";
 
 type PatientRow = Database["public"]["Tables"]["agenda_patients"]["Row"];
 type LocationRow = Database["public"]["Tables"]["agenda_locations"]["Row"];
@@ -69,6 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   let locationId: string | null = null;
+  let locationName = "Consultorio";
   let locationTimezone = "America/Argentina/Buenos_Aires";
   let bufferMinutes = 0;
   let businessHours: Record<string, [string, string][]> = {};
@@ -76,13 +80,14 @@ export async function POST(request: NextRequest) {
   if (location_id) {
     const { data: locationRow } = await supabase
       .from("agenda_locations")
-      .select("id, timezone, buffer_minutes, business_hours")
+      .select("id, name, timezone, buffer_minutes, business_hours")
       .eq("tenant_id", tenantId)
       .eq("id", location_id)
       .maybeSingle();
-    const typed = locationRow as Pick<LocationRow, "id" | "timezone" | "buffer_minutes" | "business_hours"> | null;
+    const typed = locationRow as Pick<LocationRow, "id" | "name" | "timezone" | "buffer_minutes" | "business_hours"> | null;
     if (typed) {
       locationId = typed.id;
+      locationName = typed.name;
       locationTimezone = typed.timezone;
       bufferMinutes = typed.buffer_minutes ?? 0;
       businessHours = (typed.business_hours as Record<string, [string, string][]>) ?? {};
@@ -92,14 +97,15 @@ export async function POST(request: NextRequest) {
   if (!locationId) {
     const { data: fallback } = await supabase
       .from("agenda_locations")
-      .select("id, timezone, buffer_minutes, business_hours")
+      .select("id, name, timezone, buffer_minutes, business_hours")
       .eq("tenant_id", tenantId)
       .order("name", { ascending: true })
       .limit(1)
       .maybeSingle();
-    const typed = fallback as Pick<LocationRow, "id" | "timezone" | "buffer_minutes" | "business_hours"> | null;
+    const typed = fallback as Pick<LocationRow, "id" | "name" | "timezone" | "buffer_minutes" | "business_hours"> | null;
     if (typed) {
       locationId = typed.id;
+      locationName = typed.name;
       locationTimezone = typed.timezone;
       bufferMinutes = typed.buffer_minutes ?? 0;
       businessHours = (typed.business_hours as Record<string, [string, string][]>) ?? {};
@@ -157,6 +163,42 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (apptError) return NextResponse.json({ error: apptError.message }, { status: 400 });
+
+  // Send WhatsApp confirmation
+  try {
+    await sendTemplateMessage({
+      to: normalizedPhone,
+      template: TEMPLATE_NAMES.appointmentCreated,
+      variables: [
+        patient,
+        startAt.toLocaleDateString("es-AR"),
+        startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+        locationName,
+      ],
+    });
+
+    await supabase.from("agenda_message_log").insert({
+      tenant_id: tenantId,
+      patient_id: patientId,
+      appointment_id: appt.id,
+      direction: "out",
+      type: TEMPLATE_NAMES.appointmentCreated,
+      status: "sent",
+    });
+
+    logInfo("appointment.created_notification_sent", {
+      tenant_id: tenantId,
+      appointment_id: appt.id,
+      patient_id: patientId,
+    });
+  } catch (err) {
+    logError("appointment.created_notification_failed", {
+      tenant_id: tenantId,
+      appointment_id: appt.id,
+      error: (err as Error)?.message ?? String(err),
+    });
+    // Don't fail the request if notification fails, just log it
+  }
 
   return NextResponse.json({ ok: true, appointment: appt });
 }

@@ -11,7 +11,7 @@ const NAV = [
   { href: "/settings", label: "Automatización" },
 ];
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, hideNav = false }: { children: React.ReactNode; hideNav?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -21,22 +21,24 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Agend.ar</p>
           <h1 className="text-3xl font-semibold">Autopilot</h1>
         </div>
-        <nav className="flex gap-4 rounded-full border border-slate-200 bg-white/70 px-4 py-2 backdrop-blur">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "rounded-full px-3 py-1 text-sm font-medium transition",
-                pathname?.startsWith(item.href)
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-500 hover:text-slate-900",
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {!hideNav && (
+          <nav className="flex gap-4 rounded-full border border-slate-200 bg-white/70 px-4 py-2 backdrop-blur">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "rounded-full px-3 py-1 text-sm font-medium transition",
+                  pathname?.startsWith(item.href)
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-500 hover:text-slate-900",
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        )}
       </header>
       {children}
     </div>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { TEMPLATE_NAMES } from "@/lib/messages";
 import { Database } from "@/types/database";
 import { AutopilotSettings } from "@/components/settings/AutopilotSettings";
+import { UsersSettings } from "@/components/settings/UsersSettings";
 import { requireTenantSession } from "@/server/auth";
 
 type LocationRow = Pick<
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
     <Shell>
       <div className="grid gap-6 lg:grid-cols-2">
         <AutopilotSettings />
+        <UsersSettings />
         <Card>
           <h2 className="text-2xl font-semibold">Plantillas WhatsApp</h2>
           <div className="mt-6 space-y-4 text-sm text-slate-600">

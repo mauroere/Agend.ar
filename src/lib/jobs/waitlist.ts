@@ -31,6 +31,19 @@ export async function runWaitlistJob() {
       const patient = (w as any).agenda_patients;
       if (!patient || patient.opt_out) continue;
 
+      // Idempotency check: Don't send the same offer twice to the same patient for the same appointment
+      const { data: existingLog } = await serviceClient
+        .from("agenda_message_log")
+        .select("id")
+        .eq("appointment_id", appt.id)
+        .eq("patient_id", patient.id)
+        .eq("type", TEMPLATE_NAMES.waitlistOffer)
+        .maybeSingle();
+
+      if (existingLog) {
+        continue;
+      }
+
       try {
         await sendTemplateMessage({
           to: patient.phone_e164,

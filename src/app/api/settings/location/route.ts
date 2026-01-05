@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await supabase
     .from("agenda_locations")
+    // @ts-ignore
     .update(payload)
     .eq("id", location.id)
     .eq("tenant_id", tenantId);
