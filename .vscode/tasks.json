@@ -1,0 +1,725 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "npm install",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "npm install",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "npm run type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "capture type-check",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-Command",
+				"Set-Location \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\"; npm run type-check"
+			]
+		},
+		{
+			"label": "capture type-check log",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-Command",
+				"Set-Location \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\"; npm run type-check *> typecheck.log"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check-raw",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "list-root",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"dir",
+				"/a"
+			]
+		},
+		{
+			"label": "find-app",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"dir",
+				"/a"
+			]
+		},
+		{
+			"label": "rm-app",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"rmdir",
+				"/s",
+				"/q",
+				"app"
+			]
+		},
+		{
+			"label": "dir-components",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"dir",
+				"components"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm: type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "npm-ci",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"ci"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"Set-Location \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\"; $env:SUPABASE_ACCESS_TOKEN=\"05b2e567\"; npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull-cmd",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && set SUPABASE_ACCESS_TOKEN=05b2e567 && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull-cmd",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && set SUPABASE_ACCESS_TOKEN=sbp_03175a25374968d8a77822aa71bc3835ff3b6f4c && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull-cmd-2",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && set SUPABASE_ACCESS_TOKEN=sbp_03175a25374968d8a77822aa71bc3835ff3b6f4c && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull-cmd-3",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && set SUPABASE_ACCESS_TOKEN=sbp_03175a25374968d8a77822aa71bc3835ff3b6f4c && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull-cmd-4",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && set SUPABASE_ACCESS_TOKEN=sbp_v0_2fd9cb57a34c933a2da64f9c102ea04833963a92 && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-pull-cmd-5",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-repair-pull",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && supabase migration repair --status reverted 20251130063037 && supabase migration repair --status reverted 20251201161607 && supabase migration repair --status reverted 20251201161617 && supabase migration repair --status reverted 20251201181613 && supabase migration repair --status reverted 20251205172601 && supabase migration repair --status applied 0001 && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-repair-pull-2",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && npx supabase@latest migration repair --status reverted 20251130063037 && npx supabase@latest migration repair --status reverted 20251201161607 && npx supabase@latest migration repair --status reverted 20251201161617 && npx supabase@latest migration repair --status reverted 20251201181613 && npx supabase@latest migration repair --status reverted 20251205172601 && npx supabase@latest migration repair --status applied 0001 && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-repair-pull-3",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && npx supabase@latest migration repair --status reverted 20251117113129 && npx supabase@latest migration repair --status reverted 20251119113544 && npx supabase@latest migration repair --status reverted 20251120135128 && npx supabase@latest migration repair --status reverted 20251120135957 && npx supabase@latest migration repair --status reverted 20251125175943 && npx supabase@latest migration repair --status reverted 20251125184935 && npx supabase@latest migration repair --status reverted 20251127154012 && npx supabase@latest migration repair --status reverted 20251130062923 && npx supabase@latest migration repair --status reverted 20251130063010 && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "supabase-db-pull-final",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/d",
+				"/s",
+				"/c",
+				"cd /d \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\" && npx supabase@latest db pull --schema public"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "npm install",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "npm type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "npm type-check verbose",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "npx tsc direct",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"tsc",
+				"--noEmit",
+				"--pretty",
+				"false"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "type-check-to-log",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Set-Location \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\"; npm run type-check -- --pretty false *>&1 | Tee-Object -FilePath typecheck-current.log"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "delete-tsbuildinfo",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Remove-Item \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\\tsconfig.tsbuildinfo\" -ErrorAction SilentlyContinue"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "type-check-to-log",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Set-Location \"c:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar\"; npm run type-check -- --pretty false *>&1 | Tee-Object -FilePath typecheck-current.log"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check-plain",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "tsc-direct",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"tsc",
+				"--noEmit",
+				"--pretty",
+				"false"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check-logfile",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false",
+				">",
+				"typecheck-run.log",
+				"2>&1"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check-logfile",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false",
+				">",
+				"typecheck-run.log",
+				"2>&1"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check-logfile",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false",
+				">",
+				"typecheck-run.log",
+				"2>&1"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check-logfile",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false",
+				">",
+				"typecheck-run.log",
+				"2>&1"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "type-check-logfile",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check",
+				"--",
+				"--pretty",
+				"false",
+				">",
+				"typecheck-run.log",
+				"2>&1"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		}
+	]
+}

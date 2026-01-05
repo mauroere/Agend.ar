@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from "next/server";
+import { TEMPLATE_NAMES, templatePreview } from "@/lib/messages";
+import { getRouteSupabase } from "@/lib/supabase/route";
+import { Database } from "@/types/database";
+
+type TemplateRow = Database["public"]["Tables"]["message_templates"]["Row"];
+
+const allowedNames = Object.values(TEMPLATE_NAMES) as string[];
+
+type IncomingTemplate = {
+  name: string;
+  content: string;
+  status: string;
+  meta_template_name?: string | null;
+};
+
+export async function POST(request: NextRequest) {
+  const supabase = getRouteSupabase() as any;
+  const { data: auth } = await supabase.auth.getSession();
+  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? null;
+  const headerTenant = request.headers.get("x-tenant-id");
+  const tenantId = tokenTenant ?? headerTenant;
+  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (headerTenant && tokenTenant && headerTenant !== tokenTenant) {
+    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const templates = (body?.templates ?? []) as IncomingTemplate[];
+
+  for (const tpl of templates) {
+    if (!allowedNames.includes(tpl.name)) {
+      return NextResponse.json({ error: `Template ${tpl.name} not allowed` }, { status: 400 });
+    }
+    if (!tpl.content || typeof tpl.content !== "string") {
+      return NextResponse.json({ error: "Invalid template content" }, { status: 400 });
+    }
+    const { data: existing } = await supabase
+      .from("message_templates")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("name", tpl.name)
+      .maybeSingle();
+
+    const existingId = (existing as Pick<TemplateRow, "id"> | null)?.id;
+
+    if (existingId) {
+      const updatePayload = {
+        content: tpl.content,
+        status: tpl.status ?? "active",
+        meta_template_name: tpl.meta_template_name ?? null,
+      } satisfies Partial<TemplateRow>;
+
+      const { error } = await supabase
+        .from("message_templates")
+        .update(updatePayload)
+        .eq("id", existingId)
+        .eq("tenant_id", tenantId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const insertPayload = {
+        tenant_id: tenantId,
+        name: tpl.name,
+        language: "es",
+        content: tpl.content,
+        status: tpl.status ?? "active",
+        meta_template_name: tpl.meta_template_name ?? null,
+      } satisfies Database["public"]["Tables"]["message_templates"]["Insert"];
+
+      const { error } = await supabase.from("message_templates").insert(insertPayload);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function GET(request: NextRequest) {
+  const supabase = getRouteSupabase() as any;
+  const { data: auth } = await supabase.auth.getSession();
+  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? null;
+  const headerTenant = request.headers.get("x-tenant-id");
+  const tenantId = tokenTenant ?? headerTenant;
+  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (headerTenant && tokenTenant && headerTenant !== tokenTenant) {
+    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
+  }
+
+  const { data, error } = await supabase
+    .from("message_templates")
+    .select("name, content, status, meta_template_name")
+    .eq("tenant_id", tenantId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // Fill defaults for missing templates
+  const typed = (data ?? []) as Array<Pick<TemplateRow, "name" | "content" | "status" | "meta_template_name">>;
+
+  const mapped = allowedNames.map((name) => {
+    const existing = typed.find((row) => row.name === name);
+    return {
+      name,
+      content: existing?.content ?? templatePreview[name as keyof typeof templatePreview],
+      status: existing?.status ?? "active",
+      meta_template_name: existing?.meta_template_name ?? null,
+    };
+  });
+
+  return NextResponse.json({ templates: mapped });
+}
