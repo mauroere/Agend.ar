@@ -182,6 +182,26 @@ type UsersInsert = {
 
 type UsersUpdate = Partial<UsersRow>;
 
+type IntegrationsRow = {
+  id: string;
+  tenant_id: string;
+  provider: string;
+  credentials: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+type IntegrationsInsert = {
+  id?: string;
+  tenant_id: string;
+  provider: string;
+  credentials: Json;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type IntegrationsUpdate = Partial<IntegrationsRow>;
+
 export interface Database {
   public: {
     Tables: {
@@ -231,6 +251,12 @@ export interface Database {
         Row: UsersRow;
         Insert: UsersInsert;
         Update: UsersUpdate;
+        Relationships: [];
+      };
+      agenda_integrations: {
+        Row: IntegrationsRow;
+        Insert: IntegrationsInsert;
+        Update: IntegrationsUpdate;
         Relationships: [];
       };
       agenda_patients: {

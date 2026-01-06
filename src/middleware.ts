@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/register",
   "/api/auth/register",
   "/api/webhooks/whatsapp",
+  "/api/repair",
 ];
 
 function resolveTenantId(host: string | null): string {

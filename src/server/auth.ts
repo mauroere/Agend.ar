@@ -4,23 +4,44 @@ import { getServerSupabase } from "@/lib/supabase/server";
 
 export async function requireTenantSession() {
   const supabase = getServerSupabase();
-  const { data } = await supabase.auth.getSession();
-  const session = data.session;
-  if (!session) redirect("/login");
+  // Use getUser instead of getSession for security and fresh metadata
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    redirect("/login");
+  }
 
   // Debug logs
-  console.log("[Auth] User:", session.user.email);
-  console.log("[Auth] App Metadata:", session.user.app_metadata);
-  console.log("[Auth] User Metadata:", session.user.user_metadata);
+  console.log("[Auth] User:", user.email);
+  console.log("[Auth] App Metadata:", user.app_metadata);
+  console.log("[Auth] User Metadata:", user.user_metadata);
 
-  const appMetadata = session.user.app_metadata || {};
-  const userMetadata = session.user.user_metadata || {};
+  const appMetadata = user.app_metadata || {};
+  const userMetadata = user.user_metadata || {};
   
   // Prioritize app_metadata, fallback to user_metadata
-  const tokenTenant = (appMetadata.tenant_id as string) || (userMetadata.tenant_id as string) || null;
+  let tokenTenant = (appMetadata.tenant_id as string) || (userMetadata.tenant_id as string) || null;
+
+  // Fallback: If metadata is missing, check the database mapping
+  if (!tokenTenant) {
+    console.log("[Auth] Metadata missing tenant_id, checking DB...");
+    const { data: rawUserRow } = await supabase
+      .from("agenda_users")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const userRow = rawUserRow as { tenant_id: string } | null;
+      
+    if (userRow) {
+      tokenTenant = userRow.tenant_id;
+      console.log("[Auth] Found tenant_id in DB:", tokenTenant);
+    }
+  }
 
   if (!tokenTenant) {
-    console.error("[Auth] Missing tenant_id in session metadata");
+    console.error("[Auth] Missing tenant_id in session metadata and DB");
+    // If we are in dev, maybe we can auto-fix or just fail
     redirect("/login?reason=missing-tenant");
   }
 
@@ -38,5 +59,5 @@ export async function requireTenantSession() {
     }
   }
 
-  return { supabase, session, tenantId: tokenTenant };
+  return { supabase, session: { user }, tenantId: tokenTenant };
 }

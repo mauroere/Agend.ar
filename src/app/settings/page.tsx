@@ -6,6 +6,7 @@ import { TEMPLATE_NAMES } from "@/lib/messages";
 import { Database } from "@/types/database";
 import { AutopilotSettings } from "@/components/settings/AutopilotSettings";
 import { UsersSettings } from "@/components/settings/UsersSettings";
+import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
 import { requireTenantSession } from "@/server/auth";
 
 type LocationRow = Pick<
@@ -29,29 +30,7 @@ export default async function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <AutopilotSettings />
         <UsersSettings />
-        <Card>
-          <h2 className="text-2xl font-semibold">Plantillas WhatsApp</h2>
-          <div className="mt-6 space-y-4 text-sm text-slate-600">
-            <article>
-              <p className="font-semibold">{TEMPLATE_NAMES.appointmentCreated}</p>
-              <p>
-                {"Hola {{1}}, turno {{2}}. Respondé 1 Confirmar · 2 Reprogramar · 3 Cancelar. STOP para salir."}
-              </p>
-            </article>
-            <article>
-              <p className="font-semibold">{TEMPLATE_NAMES.reminder24h}</p>
-              <p>{"Recordatorio {{1}} mañana {{2}}. Confirmado = 1, Reprogramar = 2, Cancelar = 3."}</p>
-            </article>
-            <article>
-              <p className="font-semibold">{TEMPLATE_NAMES.reminder2h}</p>
-              <p>{"Recordatorio {{1}} en pocas horas. Confirmado = 1, Reprogramar = 2, Cancelar = 3."}</p>
-            </article>
-            <article>
-              <p className="font-semibold">{TEMPLATE_NAMES.waitlistOffer}</p>
-              <p>{"Se liberó un turno. Respondé 1 para tomarlo o STOP para salir."}</p>
-            </article>
-          </div>
-        </Card>
+        <IntegrationsSettings />
       </div>
     </Shell>
   );

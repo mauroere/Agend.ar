@@ -1,137 +1,174 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
 import { TEMPLATE_NAMES, templatePreview } from "@/lib/messages";
+import { Loader2, Save } from "lucide-react";
 
-type TemplateRecord = {
+type Template = {
   name: string;
   content: string;
   status: string;
 };
 
-const toggleMap: Record<string, string> = {
-  confirm_now: TEMPLATE_NAMES.appointmentCreated,
-  reminder_24: TEMPLATE_NAMES.reminder24h,
-  reminder_2: TEMPLATE_NAMES.reminder2h,
-};
-
-const toggleLabels: Record<string, { label: string; description: string }> = {
-  confirm_now: { label: "Confirmación inmediata", description: "Se envía al crear el turno" },
-  reminder_24: { label: "Recordatorio T-24", description: "24h antes" },
-  reminder_2: { label: "Recordatorio T-2", description: "2h antes" },
+const templateConfig: Record<string, { label: string; description: string }> = {
+  [TEMPLATE_NAMES.appointmentCreated]: { 
+    label: "Confirmación inmediata", 
+    description: "Mensaje enviado automáticamente al agendar un nuevo turno." 
+  },
+  [TEMPLATE_NAMES.reminder24h]: { 
+    label: "Recordatorio 24hs", 
+    description: "Recordatorio enviado un día antes de la cita." 
+  },
+  [TEMPLATE_NAMES.reminder2h]: { 
+    label: "Recordatorio 2hs", 
+    description: "Recordatorio enviado el mismo día, 2 horas antes." 
+  },
+  [TEMPLATE_NAMES.waitlistOffer]: { 
+    label: "Lista de Espera", 
+    description: "Aviso automático cuando se libera un turno." 
+  },
 };
 
 export function AutopilotSettings() {
-  const [templates, setTemplates] = useState<TemplateRecord[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/settings/templates");
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? "No se pudo cargar");
-        setTemplates(body.templates as TemplateRecord[]);
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+    fetch("/api/settings/templates")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.templates) {
+          // Ensure all known templates exist in state even if DB doesn't have them yet
+          const merged = Object.values(TEMPLATE_NAMES).map(name => {
+            const existing = data.templates.find((t: Template) => t.name === name);
+            return existing || { 
+              name, 
+              content: templatePreview[name as keyof typeof templatePreview] || "", 
+              status: "inactive" 
+            };
+          });
+          setTemplates(merged);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las configuraciones.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [toast]);
 
-  const toggleState = (key: string) => templates.find((t) => t.name === toggleMap[key])?.status === "active";
-
-  function handleToggle(key: string, checked: boolean) {
-    setTemplates((prev) =>
-      prev.map((tpl) =>
-        tpl.name === toggleMap[key] ? { ...tpl, status: checked ? "active" : "inactive" } : tpl,
-      ),
-    );
-  }
-
-  function handleContentChange(name: string, content: string) {
-    setTemplates((prev) => prev.map((tpl) => (tpl.name === name ? { ...tpl, content } : tpl)));
-  }
-
-  async function handleSave(event: React.FormEvent) {
-    event.preventDefault();
+  const handleSave = async () => {
     setSaving(true);
-    setError(null);
-    setSuccess(false);
     try {
       const res = await fetch("/api/settings/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ templates }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "No se pudo guardar");
-      setSuccess(true);
-    } catch (e) {
-      setError(String(e));
+
+      if (!res.ok) throw new Error("Error al guardar");
+
+      toast({
+        title: "Cambios guardados",
+        description: "La configuración de automatización ha sido actualizada.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios.",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateTemplate = (name: string, updates: Partial<Template>) => {
+    setTemplates((prev) =>
+      prev.map((t) => (t.name === name ? { ...t, ...updates } : t))
+    );
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Automatización</CardTitle>
+          <CardDescription>Configura los mensajes automáticos de WhatsApp.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">Autopiloto</h2>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+        <div className="space-y-1">
+          <CardTitle>Automatización</CardTitle>
+          <CardDescription>Gestiona tus mensajes automáticos y plantillas.</CardDescription>
+        </div>
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Guardando..." : "Guardar"}
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Guardar
         </Button>
-      </div>
-      {loading && <p className="mt-4 text-sm text-slate-500">Cargando…</p>}
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-      {success && <p className="mt-4 text-sm text-green-700">Guardado</p>}
+      </CardHeader>
+      <CardContent className="space-y-8">
+        {templates.map((tpl) => {
+          const config = templateConfig[tpl.name] || { label: tpl.name, description: "" };
+          const isActive = tpl.status === "active";
 
-      {!loading && (
-        <div className="mt-6 space-y-6">
-          <div className="space-y-4">
-            {Object.keys(toggleMap).map((key) => (
-              <label key={key} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
-                <div>
-                  <p className="font-medium">{toggleLabels[key].label}</p>
-                  <p className="text-sm text-slate-500">{toggleLabels[key].description}</p>
+          return (
+            <div key={tpl.name} className="rounded-lg border border-slate-100 bg-slate-50/50 p-4 transition-all hover:border-slate-200">
+              <div className="mb-4 flex items-start justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor={`switch-${tpl.name}`} className="text-base font-medium">
+                    {config.label}
+                  </Label>
+                  <p className="text-sm text-slate-500">{config.description}</p>
                 </div>
-                <input
-                  type="checkbox"
-                  className="h-6 w-12 rounded-full"
-                  checked={toggleState(key)}
-                  onChange={(e) => handleToggle(key, e.target.checked)}
-                />
-              </label>
-            ))}
-          </div>
-
-          <div className="space-y-6">
-            {templates.map((tpl) => (
-              <div key={tpl.name} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold">{tpl.name}</p>
-                  <span className="text-xs uppercase text-slate-500">{tpl.status}</span>
-                </div>
-                <textarea
-                  className="min-h-[80px] w-full rounded-lg border border-slate-200 p-3 text-sm"
-                  value={tpl.content ?? templatePreview[tpl.name as keyof typeof templatePreview]}
-                  onChange={(e) => handleContentChange(tpl.name, e.target.value)}
+                <Switch
+                  id={`switch-${tpl.name}`}
+                  checked={isActive}
+                  onCheckedChange={(checked) => 
+                    updateTemplate(tpl.name, { status: checked ? "active" : "inactive" })
+                  }
                 />
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              
+              <div className={isActive ? "opacity-100 transition-opacity" : "opacity-50 transition-opacity"}>
+                <Label htmlFor={`text-${tpl.name}`} className="mb-2 block text-xs font-medium uppercase text-slate-500">
+                  Plantilla del mensaje
+                </Label>
+                <Textarea
+                  id={`text-${tpl.name}`}
+                  value={tpl.content}
+                  onChange={(e) => updateTemplate(tpl.name, { content: e.target.value })}
+                  className="min-h-[80px] resize-y bg-white"
+                  placeholder="Escribe el mensaje aquí..."
+                />
+                <p className="mt-2 text-xs text-slate-400">
+                  Variables disponibles: {"{{1}}"}, {"{{2}}"}, etc. según corresponda.
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
     </Card>
   );
 }
