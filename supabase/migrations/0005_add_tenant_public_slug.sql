@@ -10,10 +10,10 @@ set public_slug = coalesce(
 )
 where public_slug is null;
 
-create unique index if not exists agenda_tenants_public_slug_idx
-  on public.agenda_tenants (public_slug)
-  where public_slug is not null;
+create unique index if not exists agenda_tenants_public_slug_idx on public.agenda_tenants (public_slug)
+where
+    public_slug is not null;
 
-create unique index if not exists agenda_tenants_custom_domain_idx
-  on public.agenda_tenants (custom_domain)
-  where custom_domain is not null;
+create unique index if not exists agenda_tenants_custom_domain_idx on public.agenda_tenants (custom_domain)
+where
+    custom_domain is not null;
