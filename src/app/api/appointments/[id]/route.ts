@@ -10,6 +10,8 @@ type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"]
 type AppointmentUpdate = Database["public"]["Tables"]["agenda_appointments"]["Update"];
 type PatientRow = Database["public"]["Tables"]["agenda_patients"]["Row"];
 type LocationRow = Database["public"]["Tables"]["agenda_locations"]["Row"];
+type ServiceRow = Database["public"]["Tables"]["agenda_services"]["Row"];
+type ProviderRow = Database["public"]["Tables"]["agenda_providers"]["Row"];
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = getRouteSupabase() as unknown as SupabaseClient<Database>;
@@ -41,7 +43,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const body = await request.json();
-  const { patient, phone, start, duration, service, notes, location_id } = body ?? {};
+  const { patient, phone, start, duration, service, notes, location_id, serviceId, providerId } = body ?? {};
+  const payload = (body ?? {}) as Record<string, unknown>;
+  const hasServiceId = Object.prototype.hasOwnProperty.call(payload, "serviceId");
+  const hasProviderId = Object.prototype.hasOwnProperty.call(payload, "providerId");
 
   if (!patient || !phone || !start) {
     return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
@@ -49,13 +54,28 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const { data: existingAppt, error: fetchError } = await db
     .from("agenda_appointments")
-    .select("id, tenant_id, location_id, start_at, end_at, status, patient_id")
+    .select(
+      "id, tenant_id, location_id, start_at, end_at, status, patient_id, service_id, service_name, service_snapshot, provider_id"
+    )
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId)
     .single();
 
   const typedExisting = existingAppt as
-    | Pick<AppointmentRow, "id" | "tenant_id" | "location_id" | "start_at" | "end_at" | "status" | "patient_id">
+    | Pick<
+        AppointmentRow,
+        | "id"
+        | "tenant_id"
+        | "location_id"
+        | "start_at"
+        | "end_at"
+        | "status"
+        | "patient_id"
+        | "service_id"
+        | "service_name"
+        | "service_snapshot"
+        | "provider_id"
+      >
     | null;
 
   if (fetchError || !typedExisting) {
@@ -68,10 +88,61 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const existingDuration = differenceInMinutes(new Date(typedExisting.end_at), new Date(typedExisting.start_at));
-  const durationMinutes = Math.max(5, Number.isFinite(Number(duration)) ? Number(duration) : existingDuration || 30);
-  const endAt = addMinutes(startAt, durationMinutes);
 
   const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+
+  const nextServiceId: string | null = hasServiceId ? (serviceId ?? null) : typedExisting.service_id ?? null;
+  type ServiceLookup = Pick<
+    ServiceRow,
+    "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "active"
+  >;
+  let resolvedService: ServiceLookup | null = null;
+  if (nextServiceId) {
+    const { data: serviceRow, error: serviceError } = await db
+      .from("agenda_services")
+      .select("id, tenant_id, name, description, duration_minutes, price_minor_units, currency, color, active")
+      .eq("tenant_id", tenantId)
+      .eq("id", nextServiceId)
+      .maybeSingle();
+
+    if (serviceError || !serviceRow) {
+      return NextResponse.json({ error: "Servicio inválido" }, { status: 400 });
+    }
+
+    if (!serviceRow.active) {
+      return NextResponse.json({ error: "El servicio está pausado" }, { status: 400 });
+    }
+
+    resolvedService = serviceRow as ServiceLookup;
+  }
+
+  const nextProviderId: string | null = hasProviderId ? (providerId ?? null) : typedExisting.provider_id ?? null;
+  type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id">;
+  let resolvedProvider: ProviderLookup | null = null;
+  if (nextProviderId) {
+    const { data: providerRow, error: providerError } = await db
+      .from("agenda_providers")
+      .select("id, tenant_id, full_name, active, default_location_id")
+      .eq("tenant_id", tenantId)
+      .eq("id", nextProviderId)
+      .maybeSingle();
+
+    if (providerError || !providerRow) {
+      return NextResponse.json({ error: "Profesional inválido" }, { status: 400 });
+    }
+
+    if (!providerRow.active) {
+      return NextResponse.json({ error: "El profesional está pausado" }, { status: 400 });
+    }
+
+    resolvedProvider = providerRow as ProviderLookup;
+  }
+
+  const durationSource = Number(
+    duration ?? resolvedService?.duration_minutes ?? existingDuration ?? 30
+  );
+  const durationMinutes = Math.max(5, Number.isFinite(durationSource) ? durationSource : existingDuration || 30);
+  const endAt = addMinutes(startAt, durationMinutes);
 
   const { data: existingPatient } = await db
     .from("agenda_patients")
@@ -102,7 +173,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     await db.from("agenda_patients").update({ full_name: patient }).eq("id", patientId).eq("tenant_id", tenantId);
   }
 
-  let locationId: string | null = location_id ?? typedExisting.location_id ?? null;
+  let locationId: string | null = location_id ?? typedExisting.location_id ?? resolvedProvider?.default_location_id ?? null;
   let locationTimezone = "America/Argentina/Buenos_Aires";
   let bufferMinutes = 0;
   let businessHours: Record<string, [string, string][]> = {};
@@ -161,7 +232,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const conflictWindowStart = addMinutes(startAt, -bufferMinutes);
   const conflictWindowEnd = addMinutes(endAt, bufferMinutes);
 
-  const { data: conflicts, error: conflictError } = await db
+  let conflictQuery = db
     .from("agenda_appointments")
     .select("id")
     .eq("tenant_id", tenantId)
@@ -169,12 +240,39 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .neq("status", "canceled")
     .neq("id", appointmentId)
     .lt("start_at", conflictWindowEnd.toISOString())
-    .gt("end_at", conflictWindowStart.toISOString())
-    .limit(1);
+    .gt("end_at", conflictWindowStart.toISOString());
+
+  if (nextProviderId) {
+    conflictQuery = conflictQuery.or(`provider_id.eq.${nextProviderId},provider_id.is.null`);
+  }
+
+  const { data: conflicts, error: conflictError } = await conflictQuery.limit(1);
 
   if (conflictError) return NextResponse.json({ error: conflictError.message }, { status: 400 });
   if (conflicts && conflicts.length > 0) {
     return NextResponse.json({ error: "Ya hay un turno en ese horario" }, { status: 409 });
+  }
+
+  const serviceSnapshot = resolvedService
+    ? {
+        id: resolvedService.id,
+        name: resolvedService.name,
+        description: resolvedService.description,
+        duration_minutes: resolvedService.duration_minutes,
+        price_minor_units: resolvedService.price_minor_units,
+        currency: resolvedService.currency,
+        color: resolvedService.color,
+      }
+    : hasServiceId
+      ? null
+      : (typedExisting.service_snapshot as AppointmentRow["service_snapshot"]);
+
+  const manualServiceName = typeof service === "string" && service.trim().length > 0 ? service.trim() : null;
+  let serviceName = typedExisting.service_name ?? null;
+  if (hasServiceId) {
+    serviceName = resolvedService?.name ?? manualServiceName;
+  } else if (manualServiceName) {
+    serviceName = manualServiceName;
   }
 
   const updatePayload = {
@@ -182,7 +280,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     patient_id: patientId,
     start_at: startAt.toISOString(),
     end_at: endAt.toISOString(),
-    service_name: service ?? null,
+    service_id: nextServiceId,
+    provider_id: nextProviderId,
+    service_name: serviceName,
+    service_snapshot: serviceSnapshot,
     internal_notes: notes ?? null,
   } satisfies AppointmentUpdate;
 

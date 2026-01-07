@@ -14,17 +14,40 @@ type CalendarAppointment = {
 	phone: string;
 	locationId?: string;
 	service?: string;
+	serviceId?: string;
+	providerId?: string;
 	notes?: string;
 };
 
 type LocationOption = { id: string; name: string };
 
+type ServiceOption = {
+	id: string;
+	name: string;
+	description: string | null;
+	duration_minutes: number;
+	price_minor_units: number | null;
+	currency: string;
+	color: string | null;
+};
+
+type ProviderOption = {
+	id: string;
+	full_name: string;
+	bio: string | null;
+	avatar_url: string | null;
+	color: string | null;
+	default_location_id: string | null;
+};
+
 type CalendarPageClientProps = {
 	appointments: CalendarAppointment[];
 	locations: LocationOption[];
+  services: ServiceOption[];
+  providers: ProviderOption[];
 };
 
-export function CalendarPageClient({ appointments, locations }: CalendarPageClientProps) {
+export function CalendarPageClient({ appointments, locations, services, providers }: CalendarPageClientProps) {
 	const [modalOpen, setModalOpen] = useState(false);
 	const [selected, setSelected] = useState<CalendarAppointment | null>(null);
 
@@ -44,6 +67,8 @@ export function CalendarPageClient({ appointments, locations }: CalendarPageClie
 			<div className="fixed bottom-8 right-8">
 				<AppointmentModal
 					locations={locations}
+					services={services}
+					providers={providers}
 					open={modalOpen}
 					onOpenChange={(open) => {
 						setModalOpen(open);

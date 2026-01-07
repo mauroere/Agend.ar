@@ -1,27 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRouteSupabase } from "@/lib/supabase/route";
-import { Database } from "@/types/database";
+import { getRouteTenantContext } from "@/server/tenant-context";
 
 export async function GET(request: NextRequest) {
-  const supabase = getRouteSupabase();
-  const { data: auth } = await supabase.auth.getSession();
-  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? null;
-  const headerTenant = request.headers.get("x-tenant-id");
-  const tenantId = tokenTenant ?? headerTenant;
-  
-  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  
-  const isDev = process.env.NODE_ENV === "development";
-  const isDefaultTenant = headerTenant === "tenant_1";
-  if (headerTenant && tokenTenant && headerTenant !== tokenTenant) {
-    if (!isDev || !isDefaultTenant) {
-      return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
-    }
-  }
+  const context = await getRouteTenantContext(request);
+  if ("error" in context) return context.error;
+  const { db, tenantId } = context;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("agenda_integrations")
     .select("*")
     .eq("tenant_id", tenantId)
@@ -34,23 +19,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getRouteSupabase();
-  const { data: auth } = await supabase.auth.getSession();
-  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? null;
-  const headerTenant = request.headers.get("x-tenant-id");
-  const tenantId = tokenTenant ?? headerTenant;
-  
-  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  
-  const isDev = process.env.NODE_ENV === "development";
-  const isDefaultTenant = headerTenant === "tenant_1";
-  if (headerTenant && tokenTenant && headerTenant !== tokenTenant) {
-    if (!isDev || !isDefaultTenant) {
-      return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
-    }
-  }
+  const context = await getRouteTenantContext(request);
+  if ("error" in context) return context.error;
+  const { db, tenantId } = context;
 
   const body = await request.json();
   const { phoneNumberId, businessAccountId, accessToken, verifyToken } = body;
@@ -63,7 +34,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Check if exists
-  const { data: rawExisting } = await supabase
+  const { data: rawExisting } = await db
     .from("agenda_integrations")
     .select("id")
     .eq("tenant_id", tenantId)
@@ -73,7 +44,7 @@ export async function POST(request: NextRequest) {
   const existing = rawExisting as { id: string } | null;
 
   if (existing) {
-    const { error } = await supabase
+    const { error } = await db
       .from("agenda_integrations")
       // @ts-ignore
       .update({
@@ -84,7 +55,7 @@ export async function POST(request: NextRequest) {
       
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   } else {
-    const { error } = await supabase
+    const { error } = await db
       .from("agenda_integrations")
       // @ts-ignore
       .insert({

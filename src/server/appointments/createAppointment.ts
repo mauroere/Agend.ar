@@ -1,0 +1,312 @@
+import { addMinutes } from "date-fns";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "@/types/database";
+import { isWithinBusinessHours } from "@/lib/scheduling";
+import { sendTemplateMessage } from "@/lib/whatsapp";
+import { TEMPLATE_NAMES } from "@/lib/messages";
+import { getTenantTemplateMap, getWhatsAppIntegrationByTenant } from "@/server/whatsapp-config";
+import { logError, logInfo } from "@/lib/logging";
+
+type PatientRow = Database["public"]["Tables"]["agenda_patients"]["Row"];
+type LocationRow = Database["public"]["Tables"]["agenda_locations"]["Row"];
+type AppointmentInsert = Database["public"]["Tables"]["agenda_appointments"]["Insert"];
+type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"];
+type ServiceRow = Database["public"]["Tables"]["agenda_services"]["Row"];
+type ProviderRow = Database["public"]["Tables"]["agenda_providers"]["Row"];
+
+type ServiceLookup = Pick<
+  ServiceRow,
+  "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "active"
+>;
+
+type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id">;
+
+type LocationLookup = Pick<LocationRow, "id" | "name" | "timezone" | "buffer_minutes" | "business_hours">;
+
+export type AppointmentCreationInput = {
+  patient: string;
+  phone: string;
+  start: string;
+  duration?: number;
+  serviceName?: string | null;
+  notes?: string | null;
+  locationId?: string | null;
+  serviceId?: string | null;
+  providerId?: string | null;
+};
+
+export class AppointmentCreationError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export async function createAppointmentForTenant(options: {
+  db: SupabaseClient<Database>;
+  tenantId: string;
+  input: AppointmentCreationInput;
+  sendNotifications?: boolean;
+}) {
+  const { db, tenantId, input, sendNotifications = true } = options;
+  const { patient, phone, start, duration, serviceName, notes, locationId: rawLocationId, serviceId, providerId } = input;
+
+  if (!patient || !phone || !start) {
+    throw new AppointmentCreationError("Missing required fields", 400);
+  }
+
+  const startAt = new Date(start);
+  if (!Number.isFinite(startAt.getTime())) {
+    throw new AppointmentCreationError("Invalid start date", 400);
+  }
+
+  const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+
+  let resolvedService: ServiceLookup | null = null;
+  if (serviceId) {
+    const { data: serviceRow, error: serviceError } = await db
+      .from("agenda_services")
+      .select("id, tenant_id, name, description, duration_minutes, price_minor_units, currency, color, active")
+      .eq("tenant_id", tenantId)
+      .eq("id", serviceId)
+      .maybeSingle();
+
+    if (serviceError || !serviceRow) {
+      throw new AppointmentCreationError("Servicio inválido", 400);
+    }
+
+    if (!serviceRow.active) {
+      throw new AppointmentCreationError("El servicio está pausado", 400);
+    }
+
+    resolvedService = serviceRow as ServiceLookup;
+  }
+
+  let resolvedProvider: ProviderLookup | null = null;
+  if (providerId) {
+    const { data: providerRow, error: providerError } = await db
+      .from("agenda_providers")
+      .select("id, tenant_id, full_name, active, default_location_id")
+      .eq("tenant_id", tenantId)
+      .eq("id", providerId)
+      .maybeSingle();
+
+    if (providerError || !providerRow) {
+      throw new AppointmentCreationError("Profesional inválido", 400);
+    }
+
+    if (!providerRow.active) {
+      throw new AppointmentCreationError("El profesional está pausado", 400);
+    }
+
+    resolvedProvider = providerRow as ProviderLookup;
+  }
+
+  const durationSource = Number(duration ?? resolvedService?.duration_minutes ?? 30);
+  const durationMinutes = Math.max(5, Number.isFinite(durationSource) ? durationSource : 30);
+  const endAt = addMinutes(startAt, durationMinutes);
+
+  const { data: existingPatient } = await db
+    .from("agenda_patients")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("phone_e164", normalizedPhone)
+    .maybeSingle();
+
+  let patientId = (existingPatient as Pick<PatientRow, "id"> | null)?.id ?? null;
+  if (!patientId) {
+    const insertPayload = {
+      tenant_id: tenantId,
+      full_name: patient,
+      phone_e164: normalizedPhone,
+      opt_out: false,
+    } satisfies Database["public"]["Tables"]["agenda_patients"]["Insert"];
+
+    const { data: inserted, error: patientError } = await db
+      .from("agenda_patients")
+      .insert(insertPayload)
+      .select("id")
+      .single();
+
+    if (patientError) {
+      throw new AppointmentCreationError(patientError.message, 400);
+    }
+
+    patientId = (inserted as Pick<PatientRow, "id">).id;
+  } else {
+    await db.from("agenda_patients").update({ full_name: patient }).eq("id", patientId).eq("tenant_id", tenantId);
+  }
+
+  let locationId: string | null = rawLocationId ?? resolvedProvider?.default_location_id ?? null;
+  let locationName = "Consultorio";
+  let locationTimezone = "America/Argentina/Buenos_Aires";
+  let bufferMinutes = 0;
+  let businessHours: Record<string, [string, string][]> = {};
+
+  const assignLocation = (row: LocationLookup | null) => {
+    if (row) {
+      locationId = row.id;
+      locationName = row.name;
+      locationTimezone = row.timezone;
+      bufferMinutes = row.buffer_minutes ?? 0;
+      businessHours = (row.business_hours as Record<string, [string, string][]>) ?? {};
+    } else {
+      locationId = null;
+    }
+  };
+
+  if (locationId) {
+    const { data: locationRow } = await db
+      .from("agenda_locations")
+      .select("id, name, timezone, buffer_minutes, business_hours")
+      .eq("tenant_id", tenantId)
+      .eq("id", locationId)
+      .maybeSingle();
+
+    assignLocation((locationRow as LocationLookup | null) ?? null);
+  }
+
+  if (!locationId) {
+    const { data: fallback } = await db
+      .from("agenda_locations")
+      .select("id, name, timezone, buffer_minutes, business_hours")
+      .eq("tenant_id", tenantId)
+      .order("name", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    assignLocation((fallback as LocationLookup | null) ?? null);
+  }
+
+  if (!locationId) {
+    throw new AppointmentCreationError("Debe crear una ubicación primero", 400);
+  }
+
+  const validHours = isWithinBusinessHours({
+    start: startAt,
+    end: endAt,
+    businessHours,
+    timeZone: locationTimezone,
+  });
+
+  if (!validHours) {
+    throw new AppointmentCreationError("Fuera del horario de atención", 400);
+  }
+
+  const conflictWindowStart = addMinutes(startAt, -bufferMinutes);
+  const conflictWindowEnd = addMinutes(endAt, bufferMinutes);
+
+  let conflictQuery = db
+    .from("agenda_appointments")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("location_id", locationId)
+    .neq("status", "canceled")
+    .lt("start_at", conflictWindowEnd.toISOString())
+    .gt("end_at", conflictWindowStart.toISOString());
+
+  if (resolvedProvider?.id) {
+    conflictQuery = conflictQuery.or(`provider_id.eq.${resolvedProvider.id},provider_id.is.null`);
+  }
+
+  const { data: conflicts, error: conflictError } = await conflictQuery.limit(1);
+
+  if (conflictError) {
+    throw new AppointmentCreationError(conflictError.message, 400);
+  }
+
+  if (conflicts && conflicts.length > 0) {
+    throw new AppointmentCreationError("Ya hay un turno en ese horario", 409);
+  }
+
+  const serviceSnapshot = resolvedService
+    ? {
+        id: resolvedService.id,
+        name: resolvedService.name,
+        description: resolvedService.description,
+        duration_minutes: resolvedService.duration_minutes,
+        price_minor_units: resolvedService.price_minor_units,
+        currency: resolvedService.currency,
+        color: resolvedService.color,
+      }
+    : null;
+
+  const normalizedServiceName = resolvedService?.name ?? (serviceName?.trim().length ? serviceName?.trim() : null);
+
+  const appointmentInsert = {
+    tenant_id: tenantId,
+    location_id: locationId,
+    patient_id: patientId,
+    start_at: startAt.toISOString(),
+    end_at: endAt.toISOString(),
+    status: "pending",
+    service_id: resolvedService?.id ?? null,
+    provider_id: resolvedProvider?.id ?? null,
+    service_name: normalizedServiceName,
+    service_snapshot: serviceSnapshot,
+    internal_notes: notes ?? null,
+  } satisfies AppointmentInsert;
+
+  const { error: apptError, data: appt } = await db
+    .from("agenda_appointments")
+    .insert(appointmentInsert)
+    .select("id, start_at, end_at, status")
+    .single();
+
+  if (apptError) {
+    throw new AppointmentCreationError(apptError.message, 400);
+  }
+
+  if (sendNotifications) {
+    try {
+      const [credentials, templateMap] = await Promise.all([
+        getWhatsAppIntegrationByTenant(db, tenantId),
+        getTenantTemplateMap(db, tenantId),
+      ]);
+
+      if (!credentials) {
+        throw new Error("WhatsApp integration missing for tenant");
+      }
+
+      const templateOverride = templateMap.get(TEMPLATE_NAMES.appointmentCreated)?.metaTemplateName ?? null;
+
+      await sendTemplateMessage({
+        to: normalizedPhone,
+        template: TEMPLATE_NAMES.appointmentCreated,
+        variables: [
+          patient,
+          startAt.toLocaleDateString("es-AR"),
+          startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+          locationName,
+        ],
+        nameOverride: templateOverride,
+        credentials,
+      });
+
+      await db.from("agenda_message_log").insert({
+        tenant_id: tenantId,
+        patient_id: patientId,
+        appointment_id: (appt as AppointmentRow).id,
+        direction: "out",
+        type: TEMPLATE_NAMES.appointmentCreated,
+        status: "sent",
+      });
+
+      logInfo("appointment.created_notification_sent", {
+        tenant_id: tenantId,
+        appointment_id: (appt as AppointmentRow).id,
+        patient_id: patientId,
+      });
+    } catch (err) {
+      logError("appointment.created_notification_failed", {
+        tenant_id: tenantId,
+        appointment_id: (appt as AppointmentRow).id,
+        error: (err as Error)?.message ?? String(err),
+      });
+    }
+  }
+
+  return { appointment: appt };
+}

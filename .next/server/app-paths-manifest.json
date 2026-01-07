@@ -1,6 +1,6 @@
 {
-  "/patients/page": "app/patients/page.js",
-  "/settings/page": "app/settings/page.js",
   "/calendar/page": "app/calendar/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/api/settings/integrations/route": "app/api/settings/integrations/route.js",
   "/today/page": "app/today/page.js"
 }

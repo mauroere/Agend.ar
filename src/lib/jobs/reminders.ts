@@ -2,6 +2,7 @@ import { addHours, differenceInMinutes } from "date-fns";
 import { serviceClient } from "@/lib/supabase/service";
 import { sendTemplateMessage } from "@/lib/whatsapp";
 import { TEMPLATE_NAMES } from "@/lib/messages";
+import { getWhatsAppIntegrationByTenant, getTenantTemplateMap } from "@/server/whatsapp-config";
 import { logError, logInfo } from "@/lib/logging";
 import { Database } from "@/types/database";
 
@@ -29,6 +30,9 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
   if (error) throw error;
   logInfo("reminder.fetched", { job: "reminder", payload: { hoursAhead, count: appointments?.length ?? 0 } });
 
+  const credentialCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByTenant>>>();
+  const templateCache = new Map<string, Awaited<ReturnType<typeof getTenantTemplateMap>>>();
+
   for (const appt of appointments ?? []) {
     const patient = appt.agenda_patients;
     if (!patient || patient.opt_out) continue;
@@ -50,11 +54,40 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
       continue;
     }
 
+    const templateKey = hoursAhead === 24 ? TEMPLATE_NAMES.reminder24h : TEMPLATE_NAMES.reminder2h;
+    const [credentials, templates] = await Promise.all([
+      (async () => {
+        if (!credentialCache.has(appt.tenant_id)) {
+          credentialCache.set(appt.tenant_id, await getWhatsAppIntegrationByTenant(serviceClient, appt.tenant_id));
+        }
+        return credentialCache.get(appt.tenant_id) ?? null;
+      })(),
+      (async () => {
+        if (!templateCache.has(appt.tenant_id)) {
+          templateCache.set(appt.tenant_id, await getTenantTemplateMap(serviceClient, appt.tenant_id));
+        }
+        return templateCache.get(appt.tenant_id);
+      })(),
+    ]);
+
+    if (!credentials) {
+      logError("reminder.missing_credentials", {
+        job: "reminder",
+        tenant_id: appt.tenant_id,
+        appointment_id: appt.id,
+      });
+      continue;
+    }
+
+    const templateOverride = templates?.get(templateKey)?.metaTemplateName ?? null;
+
     try {
       await sendTemplateMessage({
         to: patient.phone_e164,
-        template: hoursAhead === 24 ? TEMPLATE_NAMES.reminder24h : TEMPLATE_NAMES.reminder2h,
+        template: templateKey,
         variables: [patient.full_name, new Date(appt.start_at).toLocaleString("es-AR")],
+        nameOverride: templateOverride,
+        credentials,
       });
 
       await serviceClient
@@ -64,7 +97,7 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
           patient_id: appt.patient_id,
           appointment_id: appt.id,
           direction: "out",
-          type: hoursAhead === 24 ? TEMPLATE_NAMES.reminder24h : TEMPLATE_NAMES.reminder2h,
+          type: templateKey,
           status: "sent",
           payload_json: { hoursAhead },
         });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,34 +18,74 @@ export function IntegrationsSettings() {
     verifyToken: "",
   });
   const { toast } = useToast();
+  const devTenantHeader =
+    process.env.NEXT_PUBLIC_DEV_TENANT_ID ?? (process.env.NODE_ENV === "development" ? "tenant_1" : undefined);
+
+  const withTenantHeaders = useCallback(
+    (headers: Record<string, string> = {}) =>
+      devTenantHeader ? { ...headers, "x-tenant-id": devTenantHeader } : headers,
+    [devTenantHeader],
+  );
 
   useEffect(() => {
-    fetch("/api/settings/integrations")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.integration?.credentials) {
+    let cancelled = false;
+
+    const loadConfig = async () => {
+      try {
+        const res = await fetch("/api/settings/integrations", {
+          headers: withTenantHeaders(),
+        });
+        const payload = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(payload?.error || "No se pudo cargar la integración");
+        }
+
+        if (!cancelled && payload.integration?.credentials) {
           setConfig({
-            phoneNumberId: data.integration.credentials.phoneNumberId || "",
-            businessAccountId: data.integration.credentials.businessAccountId || "",
-            accessToken: data.integration.credentials.accessToken || "",
-            verifyToken: data.integration.credentials.verifyToken || "",
+            phoneNumberId: payload.integration.credentials.phoneNumberId || "",
+            businessAccountId: payload.integration.credentials.businessAccountId || "",
+            accessToken: payload.integration.credentials.accessToken || "",
+            verifyToken: payload.integration.credentials.verifyToken || "",
           });
         }
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error);
+          toast({
+            title: "Error al cargar",
+            description: error instanceof Error ? error.message : "No pudimos obtener la configuración.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [toast, withTenantHeaders]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const res = await fetch("/api/settings/integrations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withTenantHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(config),
       });
 
-      if (!res.ok) throw new Error("Error al guardar");
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(payload?.error || "Error al guardar");
+      }
 
       toast({
         title: "Configuración guardada",
@@ -54,7 +94,7 @@ export function IntegrationsSettings() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudieron guardar los cambios.",
+        description: error instanceof Error ? error.message : "No se pudieron guardar los cambios.",
         variant: "destructive",
       });
     } finally {

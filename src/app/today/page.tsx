@@ -1,31 +1,38 @@
 import { endOfDay, format, startOfDay } from "date-fns";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { Shell } from "@/components/layout/Shell";
 import { TodayInbox } from "@/components/today/TodayInbox";
 import { LocationSwitcher } from "@/components/location/LocationSwitcher";
 import { Database } from "@/types/database";
 import { requireTenantSession } from "@/server/auth";
+import { serviceClient } from "@/lib/supabase/service";
 
 type AppointmentRow = Database["public"]["Tables"]["agenda_appointments"]["Row"] & {
   agenda_patients: Pick<Database["public"]["Tables"]["agenda_patients"]["Row"], "full_name"> | null;
 };
 type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id" | "name">;
 
+type AnySupabaseClient = SupabaseClient<Database, "public", any>;
+
 export default async function TodayPage({ searchParams }: { searchParams: { location?: string } }) {
   const { supabase, tenantId } = await requireTenantSession();
-  const { data: locationRows } = await supabase
+  const db = (serviceClient ?? supabase) as AnySupabaseClient;
+
+  const { data: locationRows } = await db
     .from("agenda_locations")
     .select("id, name")
     .eq("tenant_id", tenantId)
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .returns<LocationRow[]>();
 
-  const locations = (locationRows as LocationRow[] | null) ?? [];
+  const locations: LocationRow[] = locationRows ?? [];
   const activeLocationId = searchParams.location && locations.some((l) => l.id === searchParams.location)
     ? searchParams.location
     : locations[0]?.id;
   const start = startOfDay(new Date()).toISOString();
   const end = endOfDay(new Date()).toISOString();
 
-  const { data } = await supabase
+  const { data } = await db
     .from("agenda_appointments")
     .select("id, start_at, status, agenda_patients:patient_id(full_name)")
     .eq("tenant_id", tenantId)

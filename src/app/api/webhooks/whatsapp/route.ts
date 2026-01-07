@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceClient } from "@/lib/supabase/service";
-import { TEMPLATE_NAMES } from "@/lib/messages";
-import { sendTemplateMessage, sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp";
 import { Json } from "@/types/database";
+import type { WhatsAppCredentials } from "@/server/whatsapp-config";
+import {
+  getWhatsAppIntegrationByPhoneId,
+  getWhatsAppIntegrationByTenant,
+  getWhatsAppIntegrationByVerifyToken,
+} from "@/server/whatsapp-config";
 
 function normalizePhone(phone: string) {
   return phone.startsWith("+") ? phone : `+${phone}`;
@@ -43,15 +48,21 @@ async function handleReply({
   patientId,
   phone,
   text,
+  credentials,
 }: {
   tenantId: string;
   patientId: string;
   phone: string;
   text: string;
+  credentials: WhatsAppCredentials | null;
 }) {
   if (!serviceClient) return;
 
   const normalized = text.trim().toUpperCase();
+  const respond = async (message: string) => {
+    if (!credentials) return;
+    await sendTextMessage({ to: phone, text: message, credentials });
+  };
 
   if (normalized === "STOP") {
     await serviceClient
@@ -67,10 +78,7 @@ async function handleReply({
       status: "queued",
       payload: { text: "Opt-out" },
     });
-    await sendTextMessage({
-      to: phone,
-      text: "Listo, no te vamos a enviar más recordatorios. Escribí SI si querés reactivar.",
-    });
+    await respond("Listo, no te vamos a enviar más recordatorios. Escribí SI si querés reactivar.");
     return;
   }
 
@@ -93,7 +101,7 @@ async function handleReply({
         .update({ status: "confirmed" })
         .eq("id", appointment.id)
         .eq("tenant_id", tenantId);
-      await sendTextMessage({ to: phone, text: "¡Perfecto! Te esperamos." });
+      await respond("¡Perfecto! Te esperamos.");
     }
 
     if (normalized === "3") {
@@ -102,10 +110,7 @@ async function handleReply({
         .update({ status: "canceled" })
         .eq("id", appointment.id)
         .eq("tenant_id", tenantId);
-      await sendTextMessage({
-        to: phone,
-        text: "Turno cancelado. Si querés otro horario respondé SI.",
-      });
+      await respond("Turno cancelado. Si querés otro horario respondé SI.");
       // Waitlist job tomará esta cancelación.
     }
 
@@ -116,10 +121,7 @@ async function handleReply({
         .eq("id", appointment.id)
         .eq("tenant_id", tenantId);
       const slots = ["09:00", "11:30", "15:00"];
-      await sendTextMessage({
-        to: phone,
-        text: `Ofrecemos ${slots.join(", ")}. Respondé A/B/C para elegir o STOP para salir`,
-      });
+      await respond(`Ofrecemos ${slots.join(", ")}. Respondé A/B/C para elegir o STOP para salir`);
     }
   }
 }
@@ -130,27 +132,74 @@ export async function GET(request: NextRequest) {
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
-    return new NextResponse(challenge ?? "OK", { status: 200 });
+  if (mode === "subscribe" && token && challenge) {
+    if (serviceClient) {
+      const integration = await getWhatsAppIntegrationByVerifyToken(serviceClient, token);
+      if (integration) {
+        return new NextResponse(challenge, { status: 200 });
+      }
+    }
+
+    if (token === process.env.WHATSAPP_VERIFY_TOKEN) {
+      return new NextResponse(challenge, { status: 200 });
+    }
   }
 
   return new NextResponse("forbidden", { status: 403 });
 }
 
 export async function POST(request: NextRequest) {
+  const client = serviceClient;
+  if (!client) {
+    console.error("Supabase service client unavailable for WhatsApp webhook");
+    return NextResponse.json({ error: "service_unavailable" }, { status: 500 });
+  }
+
   const payload = await request.json();
   const entries = payload.entry ?? [];
   const tenantFromHeader = request.headers.get("x-tenant-id") ?? undefined;
+  const tenantCredentialCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByTenant>>>();
+  const phoneLookupCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByPhoneId>>>();
+
+  const resolveTenant = async (metadata: Record<string, any> | undefined) => {
+    const candidateTenant = tenantFromHeader ?? metadata?.tenant_id;
+    if (candidateTenant) {
+      if (!tenantCredentialCache.has(candidateTenant)) {
+        tenantCredentialCache.set(candidateTenant, await getWhatsAppIntegrationByTenant(client, candidateTenant));
+      }
+      return {
+        tenantId: candidateTenant,
+        credentials: tenantCredentialCache.get(candidateTenant) ?? null,
+      };
+    }
+
+    const phoneNumberId = metadata?.phone_number_id;
+    if (phoneNumberId) {
+      if (!phoneLookupCache.has(phoneNumberId)) {
+        phoneLookupCache.set(phoneNumberId, await getWhatsAppIntegrationByPhoneId(client, phoneNumberId));
+      }
+      const match = phoneLookupCache.get(phoneNumberId);
+      if (match) {
+        tenantCredentialCache.set(match.tenantId, match.credentials);
+        return match;
+      }
+    }
+
+    return null;
+  };
 
   for (const entry of entries) {
     for (const change of entry.changes ?? []) {
+      const resolution = await resolveTenant(change.value?.metadata ?? undefined);
+      if (!resolution) {
+        continue;
+      }
+
+      const { tenantId, credentials } = resolution;
       const messages = change.value?.messages ?? [];
       for (const message of messages) {
         const from = normalizePhone(message.from);
-        const tenantId = tenantFromHeader ?? change.value?.metadata?.tenant_id ?? "tenant_1";
-
-        if (!serviceClient) continue;
-        const { data: patient } = await serviceClient
+        const { data: patient } = await client
           .from("agenda_patients")
           .select("id, tenant_id, opt_out")
           .eq("phone_e164", from)
@@ -175,6 +224,7 @@ export async function POST(request: NextRequest) {
             patientId: patient.id,
             phone: from,
             text: message.text?.body ?? "",
+            credentials,
           });
         }
       }

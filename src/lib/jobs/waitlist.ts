@@ -2,6 +2,7 @@ import { addHours } from "date-fns";
 import { serviceClient } from "@/lib/supabase/service";
 import { sendTemplateMessage } from "@/lib/whatsapp";
 import { TEMPLATE_NAMES } from "@/lib/messages";
+import { getWhatsAppIntegrationByTenant, getTenantTemplateMap } from "@/server/whatsapp-config";
 import { logError, logInfo } from "@/lib/logging";
 
 export async function runWaitlistJob() {
@@ -17,7 +18,37 @@ export async function runWaitlistJob() {
 
   logInfo("waitlist.canceled_found", { job: "waitlist", payload: { count: canceled?.length ?? 0 } });
 
+  const credentialCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByTenant>>>();
+  const templateCache = new Map<string, Awaited<ReturnType<typeof getTenantTemplateMap>>>();
+  const templateKey = TEMPLATE_NAMES.waitlistOffer;
+
   for (const appt of canceled ?? []) {
+    const [credentials, templates] = await Promise.all([
+      (async () => {
+        if (!credentialCache.has(appt.tenant_id)) {
+          credentialCache.set(appt.tenant_id, await getWhatsAppIntegrationByTenant(serviceClient, appt.tenant_id));
+        }
+        return credentialCache.get(appt.tenant_id) ?? null;
+      })(),
+      (async () => {
+        if (!templateCache.has(appt.tenant_id)) {
+          templateCache.set(appt.tenant_id, await getTenantTemplateMap(serviceClient, appt.tenant_id));
+        }
+        return templateCache.get(appt.tenant_id);
+      })(),
+    ]);
+
+    if (!credentials) {
+      logError("waitlist.missing_credentials", {
+        job: "waitlist",
+        tenant_id: appt.tenant_id,
+        appointment_id: appt.id,
+      });
+      continue;
+    }
+
+    const templateOverride = templates?.get(templateKey)?.metaTemplateName ?? null;
+
     const { data: waiters } = await serviceClient
       .from("agenda_waitlist")
       .select("id, patient_id, priority, agenda_patients:patient_id(id, full_name, phone_e164, opt_out)")
@@ -47,11 +78,13 @@ export async function runWaitlistJob() {
       try {
         await sendTemplateMessage({
           to: patient.phone_e164,
-          template: TEMPLATE_NAMES.waitlistOffer,
+          template: templateKey,
           variables: [
             new Date(appt.start_at).toLocaleDateString("es-AR"),
             new Date(appt.start_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
           ],
+          nameOverride: templateOverride,
+          credentials,
         });
 
         await serviceClient.from("agenda_message_log").insert({
@@ -59,7 +92,7 @@ export async function runWaitlistJob() {
           patient_id: patient.id,
           appointment_id: appt.id,
           direction: "out",
-          type: TEMPLATE_NAMES.waitlistOffer,
+          type: templateKey,
           status: "sent",
         });
 

@@ -856,6 +856,124 @@
 			],
 			"isBackground": false,
 			"group": "test"
+		},
+		{
+			"label": "install-dependencies",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"react-day-picker",
+				"date-fns"
+			],
+			"isBackground": false,
+			"group": "none"
+		},
+		{
+			"label": "install-more-dependencies",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"cmdk",
+				"@radix-ui/react-popover"
+			],
+			"isBackground": false,
+			"group": "none"
+		},
+		{
+			"label": "install-dialog",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"@radix-ui/react-dialog"
+			],
+			"isBackground": false,
+			"group": "none"
+		},
+		{
+			"label": "install-deps",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"lucide-react",
+				"date-fns"
+			],
+			"isBackground": false,
+			"group": "none"
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "type-check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"type-check"
+			]
+		},
+		{
+			"label": "lint",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"lint"
+			]
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			]
+		},
+		{
+			"label": "npm-install",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			]
+		},
+		{
+			"label": "lint",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"lint"
+			]
+		},
+		{
+			"label": "lint-run",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d C:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar && npm run lint"
+			]
+		},
+		{
+			"label": "lint-run",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d C:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar && npm run lint"
+			]
 		}
 	]
 }

@@ -8,7 +8,10 @@ type AppointmentsRow = {
   start_at: string;
   end_at: string;
   status: string;
+  service_id: string | null;
+  provider_id: string | null;
   service_name: string | null;
+  service_snapshot: Json | null;
   internal_notes: string | null;
   created_by: string | null;
   updated_at: string;
@@ -22,13 +25,82 @@ type AppointmentsInsert = {
   start_at: string;
   end_at: string;
   status: string;
+  service_id?: string | null;
+  provider_id?: string | null;
   service_name?: string | null;
+  service_snapshot?: Json | null;
   internal_notes?: string | null;
   created_by?: string | null;
   updated_at?: string;
 };
 
 type AppointmentsUpdate = Partial<AppointmentsRow>;
+
+type ServicesRow = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  duration_minutes: number;
+  price_minor_units: number | null;
+  currency: string;
+  color: string | null;
+  image_url: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type ServicesInsert = {
+  id?: string;
+  tenant_id: string;
+  name: string;
+  description?: string | null;
+  duration_minutes?: number;
+  price_minor_units?: number | null;
+  currency?: string;
+  color?: string | null;
+  image_url?: string | null;
+  active?: boolean;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type ServicesUpdate = Partial<ServicesRow>;
+
+type ProvidersRow = {
+  id: string;
+  tenant_id: string;
+  full_name: string;
+  bio: string | null;
+  avatar_url: string | null;
+  color: string | null;
+  default_location_id: string | null;
+  active: boolean;
+  specialties: string[];
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+type ProvidersInsert = {
+  id?: string;
+  tenant_id: string;
+  full_name: string;
+  bio?: string | null;
+  avatar_url?: string | null;
+  color?: string | null;
+  default_location_id?: string | null;
+  active?: boolean;
+  specialties?: string[];
+  metadata?: Json;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type ProvidersUpdate = Partial<ProvidersRow>;
 
 type PatientsRow = {
   id: string;
@@ -227,6 +299,18 @@ export interface Database {
         Row: MessageLogRow;
         Insert: MessageLogInsert;
         Update: MessageLogUpdate;
+        Relationships: [];
+      };
+      agenda_services: {
+        Row: ServicesRow;
+        Insert: ServicesInsert;
+        Update: ServicesUpdate;
+        Relationships: [];
+      };
+      agenda_providers: {
+        Row: ProvidersRow;
+        Insert: ProvidersInsert;
+        Update: ProvidersUpdate;
         Relationships: [];
       };
       agenda_message_templates: {
