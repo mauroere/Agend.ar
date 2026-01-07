@@ -3,6 +3,7 @@ import { serviceClient } from "@/lib/supabase/service";
 import { sendTextMessage } from "@/lib/whatsapp";
 import { Json } from "@/types/database";
 import type { WhatsAppCredentials } from "@/server/whatsapp-config";
+import { getTenantHeaderInfo } from "@/server/tenant-headers";
 import {
   getWhatsAppIntegrationByPhoneId,
   getWhatsAppIntegrationByTenant,
@@ -157,7 +158,8 @@ export async function POST(request: NextRequest) {
 
   const payload = await request.json();
   const entries = payload.entry ?? [];
-  const tenantFromHeader = request.headers.get("x-tenant-id") ?? undefined;
+  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
+  const tenantFromHeader = headerInfo.internalId ?? undefined;
   const tenantCredentialCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByTenant>>>();
   const phoneLookupCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByPhoneId>>>();
 

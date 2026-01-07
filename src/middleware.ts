@@ -1,26 +1,66 @@
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { findTenantByPublicIdentifier } from "@/server/tenant-routing";
 
-const PUBLIC_PATHS = [
+const PUBLIC_PATH_PREFIXES = [
   "/login",
   "/register",
   "/api/auth/register",
   "/api/webhooks/whatsapp",
   "/api/repair",
+  "/book",
+  "/api/public",
 ];
 
-function resolveTenantId(host: string | null): string {
-  if (!host) return "tenant_1";
-  const lower = host.toLowerCase();
-  if (lower.startsWith("localhost") || lower.startsWith("127.")) {
-    return "tenant_1";
+const DEV_TENANT_SLUG = process.env.NEXT_PUBLIC_DEV_TENANT_SLUG ?? "tenant_1";
+const DEV_TENANT_ID = process.env.NEXT_PUBLIC_DEV_TENANT_ID ?? null;
+
+type TenantResolution = {
+  slug: string | null;
+  id: string | null;
+};
+
+let cachedDevTenant: TenantResolution | null = null;
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+async function resolveDevTenant(): Promise<TenantResolution> {
+  if (cachedDevTenant) return cachedDevTenant;
+  if (DEV_TENANT_ID) {
+    cachedDevTenant = { slug: DEV_TENANT_SLUG, id: DEV_TENANT_ID };
+    return cachedDevTenant;
   }
-  const parts = lower.split(".");
-  if (parts.length < 3) return "tenant_1";
-  const subdomain = parts[0];
-  if (!subdomain || subdomain === "www") return "tenant_1";
-  return subdomain;
+  const tenant = await findTenantByPublicIdentifier({ slug: DEV_TENANT_SLUG });
+  cachedDevTenant = { slug: DEV_TENANT_SLUG, id: tenant?.id ?? null };
+  return cachedDevTenant;
+}
+
+async function resolveTenantFromHost(host: string | null): Promise<TenantResolution | null> {
+  if (!host) {
+    return resolveDevTenant();
+  }
+
+  const normalizedHost = host.toLowerCase().split(":")[0];
+
+  if (
+    normalizedHost.startsWith("localhost") ||
+    normalizedHost.startsWith("127.") ||
+    normalizedHost === "[::1]"
+  ) {
+    return resolveDevTenant();
+  }
+
+  const segments = normalizedHost.split(".");
+  const slugCandidate = segments.length >= 3 && segments[0] !== "www" ? segments[0] : null;
+
+  const tenant = await findTenantByPublicIdentifier({ domain: normalizedHost, slug: slugCandidate });
+  if (!tenant) {
+    return null;
+  }
+  return { slug: tenant.public_slug ?? slugCandidate ?? null, id: tenant.id };
 }
 
 export async function middleware(req: NextRequest) {
@@ -29,7 +69,7 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
 
   const { pathname, host } = req.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  const isPublic = isPublicPath(pathname);
 
   if (!isPublic && !session) {
     const url = req.nextUrl.clone();
@@ -38,8 +78,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const tenantId = resolveTenantId(host);
-  res.headers.set("x-tenant-id", tenantId);
+  const tenantResolution = await resolveTenantFromHost(host);
+  if (tenantResolution?.slug) {
+    res.headers.set("x-tenant-id", tenantResolution.slug);
+  }
+  if (tenantResolution?.id) {
+    res.headers.set("x-tenant-internal-id", tenantResolution.id);
+  }
 
   return res;
 }

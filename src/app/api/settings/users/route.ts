@@ -2,14 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { serviceClient } from "@/lib/supabase/service";
 import { Database } from "@/types/database";
+import { getTenantHeaderInfo } from "@/server/tenant-headers";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const supabase = getRouteSupabase();
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const tokenTenant = (session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? (session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? null;
+  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
+  const tenantId = tokenTenant ?? headerInfo.internalId;
+  if (!session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const tenantId = session.user.app_metadata.tenant_id;
-  if (!tenantId) return NextResponse.json({ error: "No tenant" }, { status: 403 });
+  if (headerInfo.internalId && tokenTenant && headerInfo.internalId !== tokenTenant && !headerInfo.isDevBypass) {
+    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
+  }
 
   // 1. Get users linked to this tenant
   const { data: tenantUsers, error: dbError } = await supabase
@@ -47,10 +54,16 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   const supabase = getRouteSupabase();
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const tokenTenant = (session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? (session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
+    ?? null;
+  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
+  const tenantId = tokenTenant ?? headerInfo.internalId;
+  if (!session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const tenantId = session.user.app_metadata.tenant_id;
-  if (!tenantId) return NextResponse.json({ error: "No tenant" }, { status: 403 });
+  if (headerInfo.internalId && tokenTenant && headerInfo.internalId !== tokenTenant && !headerInfo.isDevBypass) {
+    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
+  }
 
   // Check if current user is owner (optional, but good practice)
   // For now, we assume any staff can invite or we skip this check to speed up.

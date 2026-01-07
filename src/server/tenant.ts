@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
+import { getTenantHeaderInfo } from "@/server/tenant-headers";
 
 export function getTenantId() {
-  const tenant = headers().get("x-tenant-id");
-  return tenant ?? "tenant_1";
+  const info = getTenantHeaderInfo(headers());
+  return info.internalId ?? info.slug ?? "tenant_1";
 }

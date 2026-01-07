@@ -3,6 +3,7 @@ import { SupabaseClient, Session } from "@supabase/supabase-js";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { serviceClient } from "@/lib/supabase/service";
 import { Database } from "@/types/database";
+import { getTenantHeaderInfo } from "@/server/tenant-headers";
 
 export type TenantContextSuccess = {
   supabase: SupabaseClient<Database>;
@@ -46,19 +47,15 @@ export async function getRouteTenantContext(request: NextRequest): Promise<Tenan
     }
   }
 
-  const headerTenant = request.headers.get("x-tenant-id");
-  const finalTenantId = tenantId ?? headerTenant;
+  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
+  const finalTenantId = tenantId ?? headerInfo.internalId ?? null;
 
   if (!finalTenantId) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
 
-  if (headerTenant && tenantId && headerTenant !== tenantId) {
-    const isDev = process.env.NODE_ENV === "development";
-    const isDefaultTenant = headerTenant === "tenant_1";
-    if (!isDev || !isDefaultTenant) {
-      return { error: NextResponse.json({ error: "Tenant mismatch" }, { status: 403 }) };
-    }
+  if (headerInfo.internalId && tenantId && headerInfo.internalId !== tenantId && !headerInfo.isDevBypass) {
+    return { error: NextResponse.json({ error: "Tenant mismatch" }, { status: 403 }) };
   }
 
   return { supabase, db, tenantId: finalTenantId, session };

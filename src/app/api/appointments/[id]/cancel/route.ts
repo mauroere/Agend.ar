@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import type { Database } from "@/types/database";
+import { getTenantHeaderInfo } from "@/server/tenant-headers";
 
-export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = getRouteSupabase();
   const { data: auth } = await supabase.auth.getSession();
   const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
     ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
     ?? null;
-  const headerTenant = _request.headers.get("x-tenant-id");
-  const tenantId = tokenTenant ?? headerTenant;
+  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
+  const tenantId = tokenTenant ?? headerInfo.internalId;
   if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  
-  const isDev = process.env.NODE_ENV === "development";
-  const isDefaultTenant = headerTenant === "tenant_1";
-  if (headerTenant && tokenTenant && headerTenant !== tokenTenant) {
-    if (!isDev || !isDefaultTenant) {
-      return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
-    }
+
+  if (headerInfo.internalId && tokenTenant && headerInfo.internalId !== tokenTenant && !headerInfo.isDevBypass) {
+    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
   }
   const appointmentId = params.id;
   if (!appointmentId) return NextResponse.json({ error: "Missing appointment id" }, { status: 400 });

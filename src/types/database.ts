@@ -228,12 +228,18 @@ type TenantsRow = {
   id: string;
   name: string;
   created_at: string;
+  public_slug: string | null;
+  custom_domain: string | null;
+  public_metadata: Json;
 };
 
 type TenantsInsert = {
   id?: string;
   name: string;
   created_at?: string;
+  public_slug?: string | null;
+  custom_domain?: string | null;
+  public_metadata?: Json;
 };
 
 type TenantsUpdate = Partial<TenantsRow>;
