@@ -85,22 +85,29 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
   const activeLocationId = searchParams.location && locations.some((l) => l.id === searchParams.location)
     ? searchParams.location
     : locations[0]?.id;
+  /*
+  // TEMPORARILY REMOVED service_id, provider_id due to schema mismatch in DB
   let appointmentQuery = db
     .from("agenda_appointments")
     .select(
-      "id, start_at, end_at, status, location_id, service_name, service_id, provider_id, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
+      "id, start_at, end_at, status, location_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
     )
     .eq("tenant_id", tenantId);
+  */
+  
+  // Using explicit query to avoid "column does not exist" error
+  const { data, error } = await db
+    .from("agenda_appointments")
+    .select(
+      "id, start_at, end_at, status, location_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
+    )
+    .eq("tenant_id", tenantId)
+    .gte("start_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Fetch last 30 days
+    .order("start_at", { ascending: true });
 
-  if (activeLocationId) {
-    appointmentQuery = appointmentQuery.eq("location_id", activeLocationId);
+  if (error) {
+     console.error("Calendar Page fetch error", error);
   }
-
-  const { data } = await appointmentQuery
-    .gte("start_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-    .lte("start_at", new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())
-    .order("start_at", { ascending: true })
-    .returns<CalendarRow[]>();
 
   const appointments = (data ?? []).map((appt) => ({
     id: appt.id,
@@ -111,8 +118,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     phone: appt.agenda_patients?.phone_e164 ?? "",
     locationId: appt.location_id ?? undefined,
     service: appt.service_name ?? "",
-    serviceId: appt.service_id ?? undefined,
-    providerId: appt.provider_id ?? undefined,
+    // Disabled IDs to match patched fetch query
+    serviceId: undefined, // appt.service_id ?? undefined,
+    providerId: undefined, // appt.provider_id ?? undefined,
     notes: appt.internal_notes ?? "",
   }));
 
@@ -127,7 +135,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     .order("name", { ascending: true })
     .returns<ServiceRow[]>();
 
-  const { data: providers } = await db
+  const { data: providerRows } = await db
     .from("agenda_providers")
     .select("id, full_name, bio, avatar_url, color, default_location_id, active")
     .eq("tenant_id", tenantId)
@@ -147,7 +155,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
       color: service.color,
     }));
 
-  const providerOptions = (providers ?? [])
+  // Fetch provider services
+  const { data: spLink } = await db
+    .from("agenda_provider_services" as any)
+    .select("provider_id, service_id")
+    .in("provider_id", providerRows?.map(p => p.id) ?? []);
+
+  const providerOptions = (providerRows ?? [])
     .filter((provider) => provider.active)
     .map((provider) => ({
       id: provider.id,
@@ -156,6 +170,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
       avatar_url: provider.avatar_url,
       color: provider.color,
       default_location_id: provider.default_location_id,
+      serviceIds: spLink?.filter(l => l.provider_id === provider.id).map(l => l.service_id) ?? []
     }));
 
   return (

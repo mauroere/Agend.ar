@@ -12,7 +12,7 @@ const NAV = [
   { href: "/calendar", label: "Calendario" },
   { href: "/today", label: "Hoy" },
   { href: "/patients", label: "Pacientes" },
-  { href: "/settings", label: "Automatización" },
+  { href: "/settings", label: "Dashboard" },
 ];
 
 export function Shell({ children, hideNav = false }: { children: ReactNode; hideNav?: boolean }) {

@@ -11,6 +11,8 @@ const providerSchema = z.object({
   defaultLocationId: z.string().uuid().optional().nullable(),
   active: z.boolean().optional(),
   specialties: z.array(z.string().max(60)).optional(),
+  metadata: z.record(z.any()).optional().nullable(),
+  serviceIds: z.array(z.string().uuid()).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -18,9 +20,9 @@ export async function GET(request: NextRequest) {
   if ("error" in context) return context.error;
   const { db, tenantId } = context;
 
-  const { data, error } = await db
+  const { data: providers, error } = await db
     .from("agenda_providers")
-    .select("id, full_name, bio, avatar_url, color, default_location_id, active, specialties")
+    .select("id, full_name, bio, avatar_url, color, default_location_id, active, specialties, metadata")
     .eq("tenant_id", tenantId)
     .order("active", { ascending: false })
     .order("full_name", { ascending: true });
@@ -29,7 +31,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ providers: data ?? [] });
+  // Fetch services map
+  const { data: servicesMap } = await db
+    .from("agenda_provider_services" as any)
+    .select("provider_id, service_id")
+    .in("provider_id", providers?.map(p => p.id) ?? [])
+    .returns<Array<{ provider_id: string; service_id: string }>>();
+
+  const providersWithServices = providers?.map(p => ({
+    ...p,
+    serviceIds: servicesMap?.filter(sm => sm.provider_id === p.id).map(sm => sm.service_id) ?? []
+  }));
+
+  return NextResponse.json({ providers: providersWithServices ?? [] });
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { fullName, bio, avatarUrl, color, defaultLocationId, active, specialties } = parsed.data;
+  const { fullName, bio, avatarUrl, color, defaultLocationId, active, specialties, metadata, serviceIds } = parsed.data;
 
   const payload: Database["public"]["Tables"]["agenda_providers"]["Insert"] = {
     tenant_id: tenantId,
@@ -54,6 +68,7 @@ export async function POST(request: NextRequest) {
     default_location_id: defaultLocationId ?? null,
     active: active ?? true,
     specialties: specialties ?? [],
+    metadata: metadata ?? {},
   };
 
   if (payload.default_location_id) {
@@ -68,11 +83,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { error } = await db.from("agenda_providers").insert(payload);
+  const { data: newProvider, error } = await db.from("agenda_providers").insert(payload).select("id").single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  if (serviceIds && serviceIds.length > 0 && newProvider) {
+    const servicesPayload = serviceIds.map(sid => ({
+      provider_id: newProvider.id,
+      service_id: sid
+    }));
+    await db.from("agenda_provider_services" as any).insert(servicesPayload);
+  }
+
+  return NextResponse.json({ ok: true, id: newProvider?.id });
 }

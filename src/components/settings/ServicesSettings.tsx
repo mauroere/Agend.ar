@@ -9,16 +9,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Plus, Edit3, DollarSign } from "lucide-react";
+import { UploadDropzone } from "@/components/uploader/UploadDropzone";
+import { cn } from "@/lib/utils";
 
-const EMPTY_FORM = {
-  name: "",
-  description: "",
-  durationMinutes: 30,
-  price: "",
-  currency: "ARS",
-  color: "",
-  imageUrl: "",
-};
+function createEmptyForm() {
+  return {
+    name: "",
+    description: "",
+    durationMinutes: 30,
+    price: "",
+    currency: "ARS",
+    color: "",
+    imageUrl: "",
+  };
+}
+
+const COLOR_PRESETS = [
+  { label: "Rubor intenso", value: "#F6708D" },
+  { label: "Coral quemado", value: "#FF8A5B" },
+  { label: "Miel suave", value: "#FFC98B" },
+  { label: "Lavanda humo", value: "#B6A5FF" },
+  { label: "Pizarra profunda", value: "#223344" },
+];
 
 type ServiceRecord = {
   id: string;
@@ -45,7 +57,7 @@ export function ServicesSettings() {
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(createEmptyForm);
   const { toast } = useToast();
 
   const loadServices = useCallback(async () => {
@@ -85,7 +97,7 @@ export function ServicesSettings() {
       });
     } else {
       setEditingId(null);
-      setForm(EMPTY_FORM);
+      setForm(createEmptyForm());
     }
     setDialogOpen(true);
   };
@@ -117,6 +129,7 @@ export function ServicesSettings() {
 
       toast({ title: "Servicio guardado", description: `${payload.name} actualizado correctamente.` });
       setDialogOpen(false);
+      setForm(createEmptyForm());
       await loadServices();
     } catch (error) {
       toast({
@@ -241,13 +254,20 @@ export function ServicesSettings() {
               </div>
               <div className="space-y-2">
                 <Label>Duración (min)</Label>
-                <Input
-                  type="number"
-                  min={5}
-                  max={480}
-                  value={form.durationMinutes}
-                  onChange={(e) => setForm((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
-                />
+                <div className="relative">
+                   <Input
+                     type="number"
+                     min={5}
+                     step={5}
+                     max={480}
+                     value={form.durationMinutes}
+                     onChange={(e) => setForm((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
+                   />
+                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                     minutos
+                   </span>
+                </div>
+                <p className="text-[10px] text-slate-500">Tiempo que ocupará en la agenda.</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -286,20 +306,41 @@ export function ServicesSettings() {
               <div className="space-y-2">
                 <Label>Color</Label>
                 <Input
-                  placeholder="#2563eb"
+                  placeholder="#F6708D"
                   value={form.color}
                   onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
                 />
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_PRESETS.map((preset) => {
+                    const isActive = preset.value.toLowerCase() === form.color.trim().toLowerCase();
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, color: preset.value }))}
+                        className={cn(
+                          "flex h-9 items-center rounded-full border px-3 text-xs font-medium text-slate-700 transition",
+                          isActive ? "border-slate-900 shadow-sm" : "border-transparent"
+                        )}
+                        style={{ backgroundColor: preset.value, color: "#fff" }}
+                        aria-label={`Usar ${preset.label}`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Imagen destacada (opcional)</Label>
-              <Input
-                placeholder="https://..."
-                value={form.imageUrl}
-                onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
-              />
-            </div>
+            <UploadDropzone
+              label="Imagen destacada (opcional)"
+              description="Arrastrá la imagen o usá la cámara. Ideal 1200x800px."
+              value={form.imageUrl}
+              folder="services"
+              accept="image/*"
+              capture="environment"
+              onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url ?? "" }))}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>

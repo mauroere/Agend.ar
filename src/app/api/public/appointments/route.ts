@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceClient } from "@/lib/supabase/service";
 import { AppointmentCreationError, createAppointmentForTenant } from "@/server/appointments/createAppointment";
+import { getTenantHeaderInfo } from "@/server/tenant-headers";
+import { resolveTenantIdFromPublicIdentifier } from "@/server/tenant-routing";
 
 export async function POST(request: NextRequest) {
   if (!serviceClient) {
@@ -8,8 +10,10 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
+  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
   const {
-    tenantId,
+    tenantId: tenantParam,
+    tenantSlug,
     patient,
     phone,
     start,
@@ -21,8 +25,15 @@ export async function POST(request: NextRequest) {
     providerId,
   } = body ?? {};
 
+  const tenantId = headerInfo.internalId
+    ?? (await resolveTenantIdFromPublicIdentifier({ tenantId: tenantParam, tenantSlug: tenantSlug ?? tenantParam }));
+
   if (!tenantId) {
     return NextResponse.json({ error: "Tenant requerido" }, { status: 400 });
+  }
+
+  if (headerInfo.internalId && headerInfo.internalId !== tenantId && !headerInfo.isDevBypass) {
+    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
   }
 
   try {

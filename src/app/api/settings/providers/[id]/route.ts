@@ -11,6 +11,8 @@ const schema = z.object({
   defaultLocationId: z.string().uuid().optional().nullable(),
   active: z.boolean().optional(),
   specialties: z.array(z.string().max(60)).optional(),
+  metadata: z.record(z.any()).optional().nullable(),
+  serviceIds: z.array(z.string().uuid()).optional(),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -30,7 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const updates: Database["public"]["Tables"]["agenda_providers"]["Update"] = {};
-  const { fullName, bio, avatarUrl, color, defaultLocationId, active, specialties } = parsed.data;
+  const { fullName, bio, avatarUrl, color, defaultLocationId, active, specialties, metadata, serviceIds } = parsed.data;
 
   if (typeof fullName === "string") updates.full_name = fullName;
   if (bio !== undefined) updates.bio = bio;
@@ -39,6 +41,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (defaultLocationId !== undefined) updates.default_location_id = defaultLocationId;
   if (typeof active === "boolean") updates.active = active;
   if (specialties) updates.specialties = specialties;
+  if (metadata !== undefined) updates.metadata = metadata;
 
   if (updates.default_location_id) {
     const { data: location, error: locError } = await db
@@ -60,6 +63,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (serviceIds) {
+    // Replace all services
+    await db.from("agenda_provider_services" as any).delete().eq("provider_id", providerId);
+    if (serviceIds.length > 0) {
+      const servicesPayload = serviceIds.map(sid => ({
+        provider_id: providerId,
+        service_id: sid
+      }));
+      await db.from("agenda_provider_services" as any).insert(servicesPayload);
+    }
   }
 
   return NextResponse.json({ ok: true });

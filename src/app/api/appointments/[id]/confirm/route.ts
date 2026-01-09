@@ -1,32 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRouteSupabase } from "@/lib/supabase/route";
-import type { Database } from "@/types/database";
-import { getTenantHeaderInfo } from "@/server/tenant-headers";
+import { getRouteTenantContext } from "@/server/tenant-context";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const supabase = getRouteSupabase();
-  const { data: auth } = await supabase.auth.getSession();
-  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? null;
-  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
-  const tenantId = tokenTenant ?? headerInfo.internalId;
-  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const context = await getRouteTenantContext(request);
+  if ("error" in context) return context.error;
+  const { db, tenantId } = context;
 
-  if (headerInfo.internalId && tokenTenant && headerInfo.internalId !== tokenTenant && !headerInfo.isDevBypass) {
-    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
-  }
   const appointmentId = params.id;
   if (!appointmentId) return NextResponse.json({ error: "Missing appointment id" }, { status: 400 });
 
-  const payload: Database["public"]["Tables"]["agenda_appointments"]["Update"] = {
-    status: "confirmed",
-  };
-
-  const { error } = await supabase
+  const { error } = await db
     .from("agenda_appointments")
-    // @ts-ignore
-    .update(payload)
+    .update({ status: "confirmed" })
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId);
 

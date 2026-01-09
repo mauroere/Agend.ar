@@ -52,7 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const { data: existingAppt, error: fetchError } = await db
     .from("agenda_appointments")
     .select(
-      "id, tenant_id, location_id, start_at, end_at, status, patient_id, service_id, service_name, service_snapshot, provider_id"
+      "id, tenant_id, location_id, start_at, end_at, status, patient_id, service_name" // Removed provider_id, service_id, snapshot
     )
     .eq("id", appointmentId)
     .eq("tenant_id", tenantId)
@@ -68,10 +68,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         | "end_at"
         | "status"
         | "patient_id"
-        | "service_id"
         | "service_name"
-        | "service_snapshot"
-        | "provider_id"
+        // | "service_id" // Removed
+        // | "service_snapshot" // Removed
+        // | "provider_id" // Removed
       >
     | null;
 
@@ -88,7 +88,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
 
-  const nextServiceId: string | null = hasServiceId ? (serviceId ?? null) : typedExisting.service_id ?? null;
+  // PATCH: DB columns missing
+  const nextServiceId: string | null = hasServiceId ? (serviceId ?? null) : null; // typedExisting.service_id ?? null;
   type ServiceLookup = Pick<
     ServiceRow,
     "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "active"
@@ -113,13 +114,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     resolvedService = serviceRow as ServiceLookup;
   }
 
-  const nextProviderId: string | null = hasProviderId ? (providerId ?? null) : typedExisting.provider_id ?? null;
-  type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id">;
+  const nextProviderId: string | null = hasProviderId ? (providerId ?? null) : null; 
+  type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id" | "metadata">;
   let resolvedProvider: ProviderLookup | null = null;
   if (nextProviderId) {
     const { data: providerRow, error: providerError } = await db
       .from("agenda_providers")
-      .select("id, tenant_id, full_name, active, default_location_id")
+      .select("id, tenant_id, full_name, active, default_location_id, metadata")
       .eq("tenant_id", tenantId)
       .eq("id", nextProviderId)
       .maybeSingle();
@@ -215,6 +216,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Debe crear una ubicación primero" }, { status: 400 });
   }
 
+  // 1. Check Provider Override (similar to createAppointment)
+  if (resolvedProvider) {
+     const provSchedule = (resolvedProvider.metadata as any)?.schedule;
+     if (provSchedule && Object.keys(provSchedule).length > 0) {
+        businessHours = provSchedule;
+     }
+  }
+
+  // 2. Fallback default hours if empty
+  if (Object.keys(businessHours).length === 0) {
+    businessHours = {
+      mon: [["09:00", "18:00"]],
+      tue: [["09:00", "18:00"]],
+      wed: [["09:00", "18:00"]],
+      thu: [["09:00", "18:00"]],
+      fri: [["09:00", "18:00"]],
+    };
+  }
+
   const validHours = isWithinBusinessHours({
     start: startAt,
     end: endAt,
@@ -223,7 +243,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   });
 
   if (!validHours) {
-    return NextResponse.json({ error: "Fuera del horario de atención" }, { status: 400 });
+    const debugInfo = `Start: ${startAt.toISOString()}, LocTZ: ${locationTimezone}, LocalDay: ${new Intl.DateTimeFormat("en-US", { timeZone: locationTimezone, weekday: "short", hour: 'numeric' }).format(startAt)}`;
+    console.error(`[AppointmentPatchError] Outside Business Hours. ${debugInfo}`);
+    return NextResponse.json({ error: `Fuera del horario de atención (${debugInfo})` }, { status: 400 });
   }
 
   const conflictWindowStart = addMinutes(startAt, -bufferMinutes);
@@ -239,9 +261,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .lt("start_at", conflictWindowEnd.toISOString())
     .gt("end_at", conflictWindowStart.toISOString());
 
+  /*
   if (nextProviderId) {
     conflictQuery = conflictQuery.or(`provider_id.eq.${nextProviderId},provider_id.is.null`);
   }
+  */
 
   const { data: conflicts, error: conflictError } = await conflictQuery.limit(1);
 
@@ -262,7 +286,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }
     : hasServiceId
       ? null
-      : (typedExisting.service_snapshot as AppointmentRow["service_snapshot"]);
+      : null; // typedExisting.service_snapshot as AppointmentRow["service_snapshot"];
 
   const manualServiceName = typeof service === "string" && service.trim().length > 0 ? service.trim() : null;
   let serviceName = typedExisting.service_name ?? null;
@@ -277,10 +301,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     patient_id: patientId,
     start_at: startAt.toISOString(),
     end_at: endAt.toISOString(),
-    service_id: nextServiceId,
-    provider_id: nextProviderId,
+    // service_id: nextServiceId, // Removed
+    // provider_id: nextProviderId, // Removed
     service_name: serviceName,
-    service_snapshot: serviceSnapshot,
+    // service_snapshot: serviceSnapshot, // Removed
     internal_notes: notes ?? null,
   } satisfies AppointmentUpdate;
 

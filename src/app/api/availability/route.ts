@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
   const db: RouteClient = (serviceClient ?? supabase) as RouteClient;
 
   try {
+    console.log(`[Availability] Request for date=${dateStr} loc=${locationId} prov=${providerId}`);
     const slots = await getAvailabilitySlots({
       db,
       tenantId,
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
       durationMinutes: duration,
       providerId,
     });
+    console.log(`[Availability] Found ${slots.length} slots`);
 
     return NextResponse.json({ slots });
   } catch (error) {

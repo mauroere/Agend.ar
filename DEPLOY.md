@@ -2,17 +2,21 @@
 
 ## Supabase
 1. Crear proyecto en https://app.supabase.com (región Sao Paulo recomendado).
-2. Ejecutar las migraciones:
+2. Ejecutar las migraciones (requiere `supabase` CLI linkeada al proyecto):
    ```bash
-   supabase db push --local
-   supabase db remote commit
+   npm run db:push
    ```
-3. Cargar seed:
+3. Backfill de `public_slug` y `custom_domain` default (idempotente, solo actualiza nulls):
+   ```bash
+   npm run db:seed-slugs
+   ```
+4. Crear bucket de Storage (desde Supabase → Storage) llamado `public-assets`, con acceso público. Este bucket guardará logos, imágenes y videos cargados desde el panel. Configurar la política pública según la documentación de Storage y setear la variable `NEXT_PUBLIC_UPLOAD_BUCKET=public-assets` (o el nombre que elijas).
+5. Cargar seed inicial:
    ```bash
    supabase db remote commit --file supabase/seed.sql
    ```
-4. Activar RLS (ya viene habilitado por migración) y configurar Storage buckets si se necesitan adjuntos.
-5. Crear JWT custom claim `tenant_id` via auth hook o mediante triggers para cada usuario nuevo.
+6. Activar RLS (ya viene habilitado por migración).
+7. Crear JWT custom claim `tenant_id` via auth hook o mediante triggers para cada usuario nuevo.
 
 ## Vercel
 1. Crear proyecto conectado al repo.

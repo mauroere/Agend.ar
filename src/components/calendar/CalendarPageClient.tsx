@@ -38,6 +38,7 @@ type ProviderOption = {
 	avatar_url: string | null;
 	color: string | null;
 	default_location_id: string | null;
+  serviceIds?: string[];
 };
 
 type CalendarPageClientProps = {

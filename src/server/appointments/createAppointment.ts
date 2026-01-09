@@ -19,7 +19,7 @@ type ServiceLookup = Pick<
   "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "active"
 >;
 
-type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id">;
+type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id" | "metadata">;
 
 type LocationLookup = Pick<LocationRow, "id" | "name" | "timezone" | "buffer_minutes" | "business_hours">;
 
@@ -62,7 +62,9 @@ export async function createAppointmentForTenant(options: {
     throw new AppointmentCreationError("Invalid start date", 400);
   }
 
-  const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+  // Improved phone normalization: Remove spaces/dashes. Ensure '+' prefix.
+  const cleanedPhone = phone.trim().replace(/[\s-]/g, "");
+  const normalizedPhone = cleanedPhone.startsWith("+") ? cleanedPhone : `+${cleanedPhone}`;
 
   let resolvedService: ServiceLookup | null = null;
   if (serviceId) {
@@ -88,7 +90,7 @@ export async function createAppointmentForTenant(options: {
   if (providerId) {
     const { data: providerRow, error: providerError } = await db
       .from("agenda_providers")
-      .select("id, tenant_id, full_name, active, default_location_id")
+      .select("id, tenant_id, full_name, active, default_location_id, metadata")
       .eq("tenant_id", tenantId)
       .eq("id", providerId)
       .maybeSingle();
@@ -184,6 +186,25 @@ export async function createAppointmentForTenant(options: {
     throw new AppointmentCreationError("Debe crear una ubicación primero", 400);
   }
 
+  // 1. Check Provider Override
+  if (resolvedProvider) {
+      const provSchedule = (resolvedProvider.metadata as any)?.schedule;
+      if (provSchedule && Object.keys(provSchedule).length > 0) {
+          businessHours = provSchedule;
+      }
+  }
+
+  // 2. Fallback default hours if empty (Matches getSlots behavior)
+  if (Object.keys(businessHours).length === 0) {
+    businessHours = {
+      mon: [["09:00", "18:00"]],
+      tue: [["09:00", "18:00"]],
+      wed: [["09:00", "18:00"]],
+      thu: [["09:00", "18:00"]],
+      fri: [["09:00", "18:00"]],
+    };
+  }
+
   const validHours = isWithinBusinessHours({
     start: startAt,
     end: endAt,
@@ -192,7 +213,9 @@ export async function createAppointmentForTenant(options: {
   });
 
   if (!validHours) {
-    throw new AppointmentCreationError("Fuera del horario de atención", 400);
+    const debugInfo = `Start: ${startAt.toISOString()}, LocTZ: ${locationTimezone}, LocalDay: ${new Intl.DateTimeFormat("en-US", { timeZone: locationTimezone, weekday: "short", hour: 'numeric' }).format(startAt)}`;
+    console.error(`[AppointmentError] Outside Business Hours. ${debugInfo}`);
+    throw new AppointmentCreationError(`Fuera del horario de atención (${debugInfo})`, 400);
   }
 
   const conflictWindowStart = addMinutes(startAt, -bufferMinutes);
@@ -207,9 +230,12 @@ export async function createAppointmentForTenant(options: {
     .lt("start_at", conflictWindowEnd.toISOString())
     .gt("end_at", conflictWindowStart.toISOString());
 
+  /*
+  // Disabled until DB migration is applied
   if (resolvedProvider?.id) {
     conflictQuery = conflictQuery.or(`provider_id.eq.${resolvedProvider.id},provider_id.is.null`);
   }
+  */
 
   const { data: conflicts, error: conflictError } = await conflictQuery.limit(1);
 
@@ -242,10 +268,10 @@ export async function createAppointmentForTenant(options: {
     start_at: startAt.toISOString(),
     end_at: endAt.toISOString(),
     status: "pending",
-    service_id: resolvedService?.id ?? null,
-    provider_id: resolvedProvider?.id ?? null,
+    // service_id: resolvedService?.id ?? null, // DISABLED: DB schema cache error
+    // provider_id: resolvedProvider?.id ?? null, // DISABLED: DB column missing
     service_name: normalizedServiceName,
-    service_snapshot: serviceSnapshot,
+    // service_snapshot: serviceSnapshot, // DISABLED: DB schema cache error
     internal_notes: notes ?? null,
   } satisfies AppointmentInsert;
 
@@ -267,22 +293,34 @@ export async function createAppointmentForTenant(options: {
       ]);
 
       if (!credentials) {
+        // Critical error for auditing
+        console.error(`[AppointmentCreation] Missing WhatsApp credentials for tenant ${tenantId}. Message NOT sent.`);
         throw new Error("WhatsApp integration missing for tenant");
       }
 
-      const templateOverride = templateMap.get(TEMPLATE_NAMES.appointmentCreated)?.metaTemplateName ?? null;
-
-      await sendTemplateMessage({
-        to: normalizedPhone,
-        template: TEMPLATE_NAMES.appointmentCreated,
-        variables: [
+      // TEMPORARY FALLBACK: Use hello_world if custom template is not ready.
+      let templateToSend = templateMap.get(TEMPLATE_NAMES.appointmentCreated)?.metaTemplateName ?? TEMPLATE_NAMES.appointmentCreated;
+      let variablesToSend: string[] | undefined = [
           patient,
           startAt.toLocaleDateString("es-AR"),
           startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
           locationName,
-        ],
-        nameOverride: templateOverride,
+          locationName // Using location as the 5th variable just in case
+        ];
+      
+      // Force hello_world just for this test while Meta approves the real one
+      // Uncomment the next line to test NOW with the generic template
+      templateToSend = "hello_world"; variablesToSend = undefined; 
+
+      console.log(`[AppointmentCreation] Sending WhatsApp to ${normalizedPhone} (Template: ${templateToSend})`);
+
+      await sendTemplateMessage({
+        to: normalizedPhone,
+        template: templateToSend,
+        variables: variablesToSend,
+        nameOverride: null, // Force no override for hello_world
         credentials,
+        languageCode: "en_US" // hello_world usually requires en_US
       });
 
       await db.from("agenda_message_log").insert({

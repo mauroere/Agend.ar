@@ -34,8 +34,9 @@ async function callWhatsAppAPI({
   });
 
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`WhatsApp API error: ${res.status} ${error}`);
+    const errorText = await res.text();
+    console.error(`[WhatsApp API Error] Status: ${res.status}, Body: ${errorText}`);
+    throw new Error(`WhatsApp API error: ${res.status} ${errorText}`);
   }
 
   return res.json();

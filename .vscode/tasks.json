@@ -974,6 +974,39 @@
 				"/c",
 				"cd /d C:\\Users\\rementeriama\\Downloads\\Code\\Agend.ar && npm run lint"
 			]
+		},
+		{
+			"label": "read_routes",
+			"type": "shell",
+			"command": "cat",
+			"args": [
+				"src/app/api/settings/integrations/route.ts",
+				"src/app/api/settings/location/route.ts",
+				"src/app/api/settings/providers/route.ts",
+				"src/app/api/settings/templates/route.ts",
+				"src/app/api/settings/users/route.ts"
+			],
+			"group": "test"
+		},
+		{
+			"label": "read_more_settings",
+			"type": "shell",
+			"command": "cat",
+			"args": [
+				"src/components/settings/UsersSettings.tsx",
+				"src/components/settings/IntegrationsSettings.tsx"
+			],
+			"group": "test"
+		},
+		{
+			"label": "read_templates_autopilot",
+			"type": "shell",
+			"command": "cat",
+			"args": [
+				"src/components/settings/TemplatesSettings.tsx",
+				"src/components/settings/AutopilotSettings.tsx"
+			],
+			"group": "test"
 		}
 	]
 }

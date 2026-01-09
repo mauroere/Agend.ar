@@ -5,6 +5,8 @@ import { UsersSettings } from "@/components/settings/UsersSettings";
 import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
 import { ServicesSettings } from "@/components/settings/ServicesSettings";
 import { ProvidersSettings } from "@/components/settings/ProvidersSettings";
+import { MicrositeSettings } from "@/components/settings/MicrositeSettings";
+import { LocationsSettings } from "@/components/settings/LocationsSettings";
 import { requireTenantSession } from "@/server/auth";
 
 type LocationRow = Pick<
@@ -26,6 +28,8 @@ export default async function SettingsPage() {
   return (
     <Shell>
       <div className="grid gap-6 lg:grid-cols-2">
+        <MicrositeSettings />
+        <LocationsSettings />
         <ServicesSettings />
         <ProvidersSettings locations={locationOptions} />
         <AutopilotSettings />

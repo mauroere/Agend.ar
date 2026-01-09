@@ -19,13 +19,45 @@ export async function GET(request: NextRequest) {
 
   if (query) {
     dbQuery = dbQuery.or(`full_name.ilike.%${query}%,phone_e164.ilike.%${query}%`);
+    const { data, error } = await dbQuery;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ patients: data });
   }
 
-  const { data, error } = await dbQuery;
+  // If no query, fetch most recent patients from appointments
+  // Strategy: Get latest appointments, extract unique patient_ids
+  const { data: recentTurnos } = await db
+    .from("agenda_appointments")
+    .select("patient_id")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const recentIds = Array.from(new Set((recentTurnos ?? []).map((t) => t.patient_id))).slice(0, limit);
+
+  if (recentIds.length > 0) {
+    const { data: recentPatients } = await db
+      .from("agenda_patients")
+      .select("id, full_name, phone_e164")
+      .in("id", recentIds);
+    
+    // Sort them back by recency (the order of recentIds)
+    const sorted = recentIds
+      .map(id => recentPatients?.find(p => p.id === id))
+      .filter(Boolean);
+
+    return NextResponse.json({ patients: sorted });
   }
+
+  // Fallback if no appointments yet: return created_at desc
+  const { data, error } = await db
+    .from("agenda_patients")
+    .select("id, full_name, phone_e164")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ patients: data });
 }

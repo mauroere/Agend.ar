@@ -1,6 +1,7 @@
 {
-  "/calendar/page": "app/calendar/page.js",
-  "/settings/page": "app/settings/page.js",
   "/today/page": "app/today/page.js",
-  "/patients/page": "app/patients/page.js"
+  "/patients/page": "app/patients/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/calendar/page": "app/calendar/page.js",
+  "/book/[tenantId]/page": "app/book/[tenantId]/page.js"
 }

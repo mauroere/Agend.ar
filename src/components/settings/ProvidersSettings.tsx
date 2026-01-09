@@ -7,16 +7,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Plus, UserCheck, Edit3 } from "lucide-react";
+import { UploadDropzone } from "@/components/uploader/UploadDropzone";
+import { Loader2, Plus, UserCheck, Edit3, Clock, CalendarOff } from "lucide-react";
+import { ProviderBlocksDialog } from "./ProviderBlocksDialog";
 
 const EMPTY_FORM = {
   fullName: "",
   bio: "",
   avatarUrl: "",
-  color: "",
   defaultLocationId: "",
   specialties: "",
+  useCustomSchedule: false,
+  customStart: "09:00",
+  customEnd: "18:00",
+  serviceIds: [] as string[],
 };
 
 type ProviderRecord = {
@@ -28,8 +34,11 @@ type ProviderRecord = {
   default_location_id: string | null;
   active: boolean;
   specialties: string[];
+  metadata: any;
+  serviceIds?: string[];
 };
 
+type ServiceOption = { id: string; name: string };
 type LocationOption = { id: string; name: string };
 
 type ProvidersSettingsProps = {
@@ -38,23 +47,33 @@ type ProvidersSettingsProps = {
 
 export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
   const [providers, setProviders] = useState<ProviderRecord[]>([]);
+  const [services, setServices] = useState<ServiceOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [blocksProvider, setBlocksProvider] = useState<ProviderRecord | null>(null); // For blocks dialog
   const [form, setForm] = useState(EMPTY_FORM);
   const { toast } = useToast();
 
-  const loadProviders = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/settings/providers");
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.error ?? "Error al cargar profesionales");
-      setProviders(payload.providers ?? []);
+      const [provRes, servRes] = await Promise.all([
+        fetch("/api/settings/providers"),
+        fetch("/api/settings/services")
+      ]);
+      
+      const provData = await provRes.json();
+      const servData = await servRes.json();
+      
+      if (!provRes.ok) throw new Error(provData?.error ?? "Error al cargar profesionales");
+      
+      setProviders(provData.providers ?? []);
+      setServices(servData.services ?? []);
     } catch (error) {
       toast({
-        title: "No pudimos cargar los profesionales",
+        title: "Error de carga",
         description: error instanceof Error ? error.message : "Reintentá en unos segundos",
         variant: "destructive",
       });
@@ -64,23 +83,27 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
   }, [toast]);
 
   useEffect(() => {
-    void loadProviders();
-  }, [loadProviders]);
+    void loadData();
+  }, [loadData]);
 
   const handleOpen = (provider?: ProviderRecord) => {
     if (provider) {
       setEditingId(provider.id);
+      const schedule = provider.metadata?.schedule?.mon?.[0]; // Simple check if custom schedule exists
       setForm({
         fullName: provider.full_name,
         bio: provider.bio ?? "",
         avatarUrl: provider.avatar_url ?? "",
-        color: provider.color ?? "",
-        defaultLocationId: provider.default_location_id ?? "",
+        defaultLocationId: provider.default_location_id ?? locations[0]?.id ?? "",
         specialties: provider.specialties.join(", "),
+        useCustomSchedule: !!schedule,
+        customStart: schedule?.[0] ?? "09:00",
+        customEnd: schedule?.[1] ?? "18:00",
+        serviceIds: provider.serviceIds ?? [],
       });
     } else {
       setEditingId(null);
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, defaultLocationId: locations[0]?.id ?? "" });
     }
     setDialogOpen(true);
   };
@@ -88,16 +111,30 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Build schedule metadata if custom
+      let metadata = {};
+      
+      if (form.useCustomSchedule) {
+         const hours = [[form.customStart, form.customEnd]];
+         metadata = {
+            schedule: {
+               mon: hours, tue: hours, wed: hours, thu: hours, fri: hours
+            }
+         };
+      }
+
       const payload = {
         fullName: form.fullName.trim(),
         bio: form.bio.trim() ? form.bio.trim() : undefined,
         avatarUrl: form.avatarUrl.trim() ? form.avatarUrl.trim() : undefined,
-        color: form.color.trim() ? form.color.trim() : undefined,
+        color: undefined, 
         defaultLocationId: form.defaultLocationId || undefined,
         specialties: form.specialties
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
+        metadata, 
+        serviceIds: form.serviceIds,
       };
 
       const endpoint = editingId ? `/api/settings/providers/${editingId}` : "/api/settings/providers";
@@ -113,7 +150,7 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
 
       toast({ title: "Profesional guardado", description: `${payload.fullName} actualizado.` });
       setDialogOpen(false);
-      await loadProviders();
+      await loadData();
     } catch (error) {
       toast({
         title: "Error",
@@ -134,7 +171,7 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "No pudimos actualizar");
-      await loadProviders();
+      await loadData();
     } catch (error) {
       toast({
         title: "Error",
@@ -151,7 +188,7 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between gap-4">
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle>Equipo & Profesionales</CardTitle>
           <CardDescription>Asigna responsables para cada tratamiento.</CardDescription>
@@ -207,6 +244,9 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
                           <UserCheck className="h-4 w-4" /> Agenda propia
                         </div>
                         <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => setBlocksProvider(provider)} title="Gestionar bloqueos/vacaciones">
+                             <CalendarOff className="h-4 w-4 text-slate-400" />
+                          </Button> 
                           <Button variant="ghost" size="sm" onClick={() => handleOpen(provider)}>
                             <Edit3 className="mr-1 h-4 w-4" /> Editar
                           </Button>
@@ -248,41 +288,82 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
                 onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))}
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Avatar (URL)</Label>
-                <Input
-                  placeholder="https://..."
-                  value={form.avatarUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Input
-                  placeholder="#0ea5e9"
-                  value={form.color}
-                  onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
-                />
-              </div>
-            </div>
             <div className="space-y-2">
-              <Label>Ubicación por defecto</Label>
-              <select
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                value={form.defaultLocationId}
-                onChange={(e) => setForm((prev) => ({ ...prev, defaultLocationId: e.target.value }))}
-              >
-                <option value="">Sin asignar</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
+              <UploadDropzone
+                label="Foto de perfil"
+                description="Arrastrá o sacá una foto. Formatos: PNG, JPG."
+                value={form.avatarUrl}
+                folder="providers"
+                accept="image/*"
+                capture="environment"
+                onChange={(url) => setForm((prev) => ({ ...prev, avatarUrl: url ?? "" }))}
+              />
             </div>
+
+            <div className="space-y-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
+               <div className="flex items-center gap-2">
+                  <Checkbox 
+                     id="customScope" 
+                     checked={form.useCustomSchedule}
+                     onCheckedChange={(c: boolean | "indeterminate") => setForm(prev => ({ ...prev, useCustomSchedule: c === true }))}
+                  />
+                  <Label htmlFor="customScope" className="cursor-pointer font-medium">Definir horario propio</Label>
+               </div>
+               
+               {form.useCustomSchedule && (
+                  <div className="ml-6 grid grid-cols-2 gap-4">
+                     <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Inicio (Lun-Vie)</Label>
+                        <Input 
+                           type="time" 
+                           value={form.customStart} 
+                           onChange={(e) => setForm(prev => ({ ...prev, customStart: e.target.value }))}
+                        />
+                     </div>
+                     <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Fin (Lun-Vie)</Label>
+                        <Input 
+                           type="time" 
+                           value={form.customEnd}
+                           onChange={(e) => setForm(prev => ({ ...prev, customEnd: e.target.value }))}
+                        />
+                     </div>
+                  </div>
+               )}
+               {!form.useCustomSchedule && (
+                  <p className="ml-6 text-xs text-slate-500">Usa el horario general de la sede.</p>
+               )}
+            </div>
+            
             <div className="space-y-2">
-              <Label>Especialidades (separadas por coma)</Label>
+               <Label>Servicios y Tratamientos</Label>
+               <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3 max-h-40 overflow-y-auto">
+                  {services.map((svc) => {
+                     const isSelected = form.serviceIds.includes(svc.id);
+                     return (
+                        <div key={svc.id} className="flex items-center gap-2">
+                           <Checkbox 
+                              id={`svc-${svc.id}`}
+                              checked={isSelected}
+                              onCheckedChange={(c) => {
+                                 setForm(prev => {
+                                    const newIds = c 
+                                       ? [...prev.serviceIds, svc.id]
+                                       : prev.serviceIds.filter(id => id !== svc.id);
+                                    return { ...prev, serviceIds: newIds };
+                                 });
+                              }}
+                           />
+                           <Label htmlFor={`svc-${svc.id}`} className="text-sm cursor-pointer">{svc.name}</Label>
+                        </div>
+                     );
+                  })}
+                  {services.length === 0 && <p className="text-xs text-slate-400">No hay servicios creados.</p>}
+               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Especialidades (etiquetas)</Label>
               <Input
                 placeholder="Masajes, Belleza, Post-operatorio"
                 value={form.specialties}
@@ -301,6 +382,14 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Blocks Dialog */}
+      <ProviderBlocksDialog 
+        open={!!blocksProvider} 
+        onOpenChange={(v) => !v && setBlocksProvider(null)} 
+        providerId={blocksProvider?.id ?? null}
+        providerName={blocksProvider?.full_name ?? ""}
+      />
     </Card>
   );
 }

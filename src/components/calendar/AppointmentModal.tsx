@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 // Assuming component primitives exist or standard HTML
-import { X, Loader2, Calendar as CalendarIcon, Clock, Check, UserPlus, Search, Info } from "lucide-react";
+import { X, Loader2, Calendar as CalendarIcon, Clock, Check, UserPlus, Search, Info, Sparkles } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { CreatePatientDialog } from "@/components/patients/CreatePatientDialog";
@@ -35,6 +35,7 @@ type ProviderOption = {
   avatar_url: string | null;
   color: string | null;
   default_location_id: string | null;
+  serviceIds?: string[];
 };
 
 type AppointmentData = {
@@ -66,7 +67,7 @@ type FormValues = {
 const INITIAL_FORM: FormValues = {
   patient: "",
   phone: "",
-  date: undefined,
+  date: undefined, 
   time: "",
   duration: 30,
   service: "",
@@ -96,7 +97,7 @@ export function AppointmentModal({ locations, services, providers, open: control
 		onOpenChange?.(value);
 	};
 
-  const [form, setForm] = useState<FormValues>(INITIAL_FORM);
+	const [form, setForm] = useState<FormValues>({ ...INITIAL_FORM, date: new Date() });
 	const [locationId, setLocationId] = useState<string>(locations[0]?.id ?? "");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -113,12 +114,19 @@ export function AppointmentModal({ locations, services, providers, open: control
   const [showCreatePatient, setShowCreatePatient] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  
+  // Recommender
+  const [lookingForSuggestions, setLookingForSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ date: string, slots: string[] }>>([]);
 
   const selectedService = useMemo(() => services.find((svc) => svc.id === form.serviceId), [services, form.serviceId]);
   const filteredProviders = useMemo(() => {
-    const scoped = providers.filter((prov) => !prov.default_location_id || prov.default_location_id === locationId);
+    let scoped = providers.filter((prov) => !prov.default_location_id || prov.default_location_id === locationId);
+    if (form.serviceId) {
+        scoped = scoped.filter(p => !p.serviceIds || p.serviceIds.length === 0 || p.serviceIds.includes(form.serviceId!));
+    }
     return scoped.length > 0 ? scoped : providers;
-  }, [providers, locationId]);
+  }, [providers, locationId, form.serviceId]);
   const selectedProvider = useMemo(
     () => providers.find((prov) => prov.id === form.providerId),
     [providers, form.providerId]
@@ -128,13 +136,10 @@ export function AppointmentModal({ locations, services, providers, open: control
 
   const fetchPatients = useCallback(async (query: string = "") => {
     const term = query.trim();
-    if (term.length < 2) {
-      setPatients([]);
-      return;
-    }
+    // Allow empty search to fetch top patients
     setPatientLoading(true);
     try {
-      const res = await fetch(`/api/patients?limit=5&q=${encodeURIComponent(term)}`);
+      const res = await fetch(`/api/patients?limit=10&q=${encodeURIComponent(term)}`);
       if (res.ok) {
         const data = await res.json();
         setPatients(
@@ -189,7 +194,7 @@ export function AppointmentModal({ locations, services, providers, open: control
 			});
 			setLocationId(appointment.locationId ?? locations[0]?.id ?? "");
 		} else {
-      setForm({ ...INITIAL_FORM });
+      setForm({ ...INITIAL_FORM, date: new Date() });
 			setLocationId(locations[0]?.id ?? "");
 		}
 		setError(null);
@@ -265,6 +270,29 @@ export function AppointmentModal({ locations, services, providers, open: control
     }
   };
 
+  const handleSuggest = async () => {
+    setLookingForSuggestions(true);
+    setSuggestions([]);
+    try {
+        const q = new URLSearchParams({
+            locationId,
+            duration: form.duration.toString(),
+            fromDate: new Date().toISOString()
+        });
+        if (form.providerId) q.set("providerId", form.providerId);
+        
+        const res = await fetch(`/api/availability/suggest?${q}`);
+        if(res.ok) {
+            const data = await res.json();
+            setSuggestions(data.suggestions ?? []);
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setLookingForSuggestions(false);
+    }
+  };
+
 	const handleSubmit = async (event: React.FormEvent) => {
 		event.preventDefault();
 		if (!hasLocations) return setError("Falta configurar Consultorio");
@@ -273,10 +301,19 @@ export function AppointmentModal({ locations, services, providers, open: control
 
     let startIso = "";
     if (form.date && form.time) {
-       const [h, m] = form.time.split(":");
-       const d = new Date(form.date);
-       d.setHours(Number(h), Number(m), 0, 0);
-       startIso = d.toISOString();
+        // Fix: form.date is a Date object, not a string.
+        // We use the local components of the selected date (Year, Month, Day)
+        // preventing timezone shifts if we were to just use .toISOString() and split.
+        const y = form.date.getFullYear();
+        const M = form.date.getMonth(); // 0-indexed
+        const d = form.date.getDate();
+        
+        const [h, m] = form.time.split(":");
+        
+        // Construct the final date in Local System Time
+        // This assumes the user is selecting "8 de Enero" meaning "8 de Enero en mi reloj actual"
+        const localDate = new Date(y, M, d, Number(h), Number(m));
+        startIso = localDate.toISOString();
     } else {
        return setError("Fecha inválida");
     }
@@ -380,9 +417,7 @@ export function AppointmentModal({ locations, services, providers, open: control
                           className="pl-10 pr-3"
                           onFocus={() => {
                             setPatientDropdownOpen(true);
-                            if (patientQuery.trim().length >= 2) {
-                              void fetchPatients(patientQuery);
-                            }
+                            void fetchPatients(patientQuery);
                           }}
                           onChange={(event) => {
                             const value = event.target.value;
@@ -392,11 +427,7 @@ export function AppointmentModal({ locations, services, providers, open: control
                               handleChange("patient", "");
                               handleChange("phone", "");
                             }
-                            if (value.trim().length >= 2) {
-                              void fetchPatients(value);
-                            } else {
-                              setPatients([]);
-                            }
+                            void fetchPatients(value);
                           }}
                         />
                         {patientDropdownOpen && (
@@ -407,10 +438,6 @@ export function AppointmentModal({ locations, services, providers, open: control
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                   Buscando pacientes...
                                 </div>
-                              ) : patientQuery.trim().length < 2 ? (
-                                <p className="px-4 py-3 text-sm text-slate-500">
-                                  Ingrese al menos 2 caracteres para buscar.
-                                </p>
                               ) : patients.length === 0 ? (
                                 <p className="px-4 py-3 text-sm text-slate-500">No encontramos coincidencias.</p>
                               ) : (
@@ -571,30 +598,40 @@ export function AppointmentModal({ locations, services, providers, open: control
 
                   <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">Duración</label>
-                        <Select 
-                          value={form.duration.toString()} 
-                          onChange={(event) => handleChange("duration", Number(event.target.value))}
-                        >
-                           <option value="15">15 min</option>
-                           <option value="30">30 min</option>
-                           <option value="45">45 min</option>
-                           <option value="60">1 hora</option>
-                           <option value="90">1.5 horas</option>
-                        </Select>
+                        <label className="text-sm font-medium text-slate-700">Duración (min)</label>
+                        <Input 
+                           type="number"
+                           min={5}
+                           step={5}
+                           value={form.duration}
+                           onChange={(e) => handleChange("duration", Number(e.target.value))}
+                        />
                      </div>
                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">Servicio</label>
-                         <Select 
+                        <label className="text-sm font-medium text-slate-700">Nombre del Servicio</label>
+                         <Input 
                            value={form.service} 
+                           placeholder="Ej. Consulta General"
                            onChange={(e) => handleChange("service", e.target.value)}
-                         >
-                           <option value="Consulta">Consulta</option>
-                           <option value="Tratamiento">Tratamiento</option>
-                           <option value="Control">Control</option>
-                        </Select>
+                           disabled={!!form.serviceId} // Disable name edit if linked to strictly defined service? Or allow edit? 
+                                                       // Better allow edit but it might confuse if it's "Botox" but named "Fillers". 
+                                                       // Let's keep it editable or handling it smarter.
+                                                       // Actually, if I pick a card, I usually want that name.
+                         />
                      </div>
                   </div>
+                  {form.serviceId && (
+                     <div className="flex items-center justify-between rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-xs text-brand-700">
+                        <span>Servicio vinculado: <strong>{services.find(s => s.id === form.serviceId)?.name}</strong></span>
+                        <button 
+                           type="button" 
+                           onClick={() => setForm(prev => ({ ...prev, serviceId: undefined, service: "", duration: 30 }))}
+                           className="hover:underline"
+                        >
+                           Desvincular
+                        </button>
+                     </div>
+                  )}
 
                   <div className="space-y-2">
                      <label className="text-sm font-medium text-slate-700">Consultorio</label>
@@ -628,7 +665,8 @@ export function AppointmentModal({ locations, services, providers, open: control
                          mode="single"
                          locale={es}
                          selected={form.date}
-                         onSelect={(d) => handleChange("date", d)}
+                         onSelect={(d) => d && handleChange("date", d)}
+                         required
                          disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                          initialFocus
                          className="p-3 pointer-events-auto"
@@ -645,7 +683,47 @@ export function AppointmentModal({ locations, services, providers, open: control
                    {!form.date ? (
                       <div className="flex flex-col items-center justify-center flex-1 border-2 border-dashed border-slate-200 rounded-lg p-6 bg-slate-50/50">
                          <CalendarIcon className="h-8 w-8 text-slate-300 mb-2" />
-                         <p className="text-sm text-slate-400 text-center">Seleccione un día para ver horarios.</p>
+                         <p className="text-sm text-slate-400 text-center mb-4">Seleccione un día para ver horarios.</p>
+                         
+                         <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleSuggest}
+                            disabled={lookingForSuggestions || !locationId}
+                            className="gap-2 text-brand-600 border-brand-200 hover:bg-brand-50"
+                        >
+                            {lookingForSuggestions ? <Loader2 className="h-3 w-3 animate-spin"/> : <Sparkles className="h-3 w-3" />}
+                            Buscar próximo turno libre
+                         </Button>
+
+                         {suggestions.length > 0 && (
+                            <div className="mt-4 w-full space-y-2">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-left">Sugerencias:</p>
+                                {suggestions.map((s) => (
+                                    <div key={s.date} className="text-left bg-white border border-slate-200 rounded-md p-2 shadow-sm">
+                                        <p className="text-xs font-medium text-slate-700 mb-1">
+                                            {format(parse(s.date, "yyyy-MM-dd", new Date()), "EEEE d 'de' MMMM", { locale: es })}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {s.slots.map(slot => (
+                                                <button
+                                                    key={slot}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        handleChange("date", parse(s.date, "yyyy-MM-dd", new Date()));
+                                                        handleChange("time", slot);
+                                                    }}
+                                                    className="px-2 py-0.5 text-xs bg-slate-50 border border-slate-200 rounded hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700 transition-colors"
+                                                >
+                                                    {slot}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                         )}
                       </div>
                    ) : availableSlots.length === 0 && !loadingSlots ? (
                       <div className="flex flex-col items-center justify-center flex-1 border border-slate-200 rounded-lg p-6 bg-white">
@@ -677,7 +755,7 @@ export function AppointmentModal({ locations, services, providers, open: control
 
           <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-             <Button type="submit" onClick={handleSubmit} disabled={loading || !form.date || !form.time}>
+             <Button type="submit" onClick={handleSubmit} disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEdit ? "Guardar Cambios" : "Confirmar Turno"}
              </Button>
