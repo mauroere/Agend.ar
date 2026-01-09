@@ -298,19 +298,21 @@ export async function createAppointmentForTenant(options: {
         throw new Error("WhatsApp integration missing for tenant");
       }
 
-      // TEMPORARY FALLBACK: Use hello_world if custom template is not ready.
+      // TEMPORARY FALLBACK: Force hello_world for testing connectivity
+      let templateToSend = "hello_world"; // Use the only existing template
+      let variablesToSend: string[] | undefined = undefined; // hello_world takes no vars
+
+      /* 
+      // REAL LOGIC (Commented out until 'appointment_created' template is made in Meta)
       let templateToSend = templateMap.get(TEMPLATE_NAMES.appointmentCreated)?.metaTemplateName ?? TEMPLATE_NAMES.appointmentCreated;
-      let variablesToSend: string[] | undefined = [
+      let variablesToSend = [
           patient,
           startAt.toLocaleDateString("es-AR"),
           startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
           locationName,
-          locationName // Using location as the 5th variable just in case
+          locationName 
         ];
-      
-      // Force hello_world just for this test while Meta approves the real one
-      // Uncomment the next line to test NOW with the generic template
-      templateToSend = "hello_world"; variablesToSend = undefined; 
+      */
 
       console.log(`[AppointmentCreation] Sending WhatsApp to ${normalizedPhone} (Template: ${templateToSend})`);
 
@@ -318,9 +320,8 @@ export async function createAppointmentForTenant(options: {
         to: normalizedPhone,
         template: templateToSend,
         variables: variablesToSend,
-        nameOverride: null, // Force no override for hello_world
         credentials,
-        languageCode: "en_US" // hello_world usually requires en_US
+        languageCode: "en_US" // hello_world is US English
       });
 
       await db.from("agenda_message_log").insert({
@@ -337,14 +338,4 @@ export async function createAppointmentForTenant(options: {
         appointment_id: (appt as AppointmentRow).id,
         patient_id: patientId,
       });
-    } catch (err) {
-      logError("appointment.created_notification_failed", {
-        tenant_id: tenantId,
-        appointment_id: (appt as AppointmentRow).id,
-        error: (err as Error)?.message ?? String(err),
-      });
-    }
-  }
-
-  return { appointment: appt };
-}
+   
