@@ -1,4 +1,5 @@
 import { addMinutes } from "date-fns";
+import { normalizePhoneNumber } from "@/lib/normalization";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/database";
 import { isWithinBusinessHours } from "@/lib/scheduling";
@@ -62,9 +63,8 @@ export async function createAppointmentForTenant(options: {
     throw new AppointmentCreationError("Invalid start date", 400);
   }
 
-  // Improved phone normalization: Remove spaces/dashes. Ensure '+' prefix.
-  const cleanedPhone = phone.trim().replace(/[\s-]/g, "");
-  const normalizedPhone = cleanedPhone.startsWith("+") ? cleanedPhone : `+${cleanedPhone}`;
+  // Phone normalization using centralized utility
+  const normalizedPhone = normalizePhoneNumber(phone);
 
   let resolvedService: ServiceLookup | null = null;
   if (serviceId) {

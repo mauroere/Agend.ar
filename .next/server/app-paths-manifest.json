@@ -1,8 +1,4 @@
 {
-  "/api/availability/route": "app/api/availability/route.js",
   "/calendar/page": "app/calendar/page.js",
-  "/today/page": "app/today/page.js",
-  "/api/appointments/[id]/confirm/route": "app/api/appointments/[id]/confirm/route.js",
-  "/api/patients/route": "app/api/patients/route.js",
-  "/api/appointments/route": "app/api/appointments/route.js"
+  "/today/page": "app/today/page.js"
 }
