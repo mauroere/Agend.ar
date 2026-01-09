@@ -1,4 +1,12 @@
 {
   "/calendar/page": "app/calendar/page.js",
-  "/today/page": "app/today/page.js"
+  "/today/page": "app/today/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/api/settings/integrations/route": "app/api/settings/integrations/route.js",
+  "/api/settings/services/route": "app/api/settings/services/route.js",
+  "/api/settings/templates/route": "app/api/settings/templates/route.js",
+  "/api/settings/users/route": "app/api/settings/users/route.js",
+  "/api/settings/microsite/route": "app/api/settings/microsite/route.js",
+  "/api/settings/locations/route": "app/api/settings/locations/route.js",
+  "/api/settings/providers/route": "app/api/settings/providers/route.js"
 }

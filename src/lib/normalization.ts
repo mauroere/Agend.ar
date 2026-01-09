@@ -32,53 +32,31 @@ export function normalizePhoneNumber(phone: string): string {
     }
     
     // Check for '9' (Mobile indicator) at the start
+    // [SANDBOX FIX]
+    // El Sandbox de Meta (versión prueba) ha verificado los números del usuario en formato LOCAL (+54 ... 15 ...).
+    // La API "oficial" pide E.164 (+54 9 ...), pero el Whitelist del Sandbox rechaza ese formato porque no hace match exacto string-a-string.
+    // Para que funcione AHORA (en desarrollo), debemos QUITAR el 9 si el usuario lo puso, para intentar coincidir con el formato local guardado.
+    
     if (rest.startsWith("9")) {
-        return "+54" + rest; 
+       // return "+54" + rest; // ANTERIOR: Preservar el 9 (Correcto para Prod)
+       
+       // NUEVO: Remover el 9 (Hack para Sandbox Match)
+       // Si el usuario puso +54 9 2324..., lo convertimos a +54 2324...
+       rest = rest.slice(1);
     }
+    
+    // Si el usuario ingresó el número CON 15 (ej: +54 9 2324 15...), al quitar el 9 queda +54 2324 15... (Match!)
+    // Si el usuario ingresó SIN 15 (ej: +54 9 2324 50...), al quitar queda +54 2324 50... (Puede fallar si Meta requiere el 15, el usuario deberá agregarlo al input).
 
-    // [MODIFICACIÓN CRÍTICA PARA SANDBOX META]
-    // El usuario reporta que Meta verifica su número como "+54 2324 15-501653" (con 15, sin 9).
-    // Sin embargo, para ENVIAR mensajes, la API oficial de WhatsApp Cloud RECHAZA el formato local (con 15)
-    // y RECHAZA el formato fijo (sin 9). EXIGE el formato E.164: +54 9 + CodigoArea + Numero (sin 15).
+    // [MODIFICACIÓN SANDBOX]
+    // Desactivamos temporalmente la inserción forzada del '9' y la limpieza del '15'.
+    // Razón: El Sandbox de Meta valida contra una lista estricta.
+    // Si la lista tiene "+54 2324 501653" (Fijo) o "+54 2324 15...", debemos enviar EXACTAMENTE eso.
+    // Si forzamos "+54 9...", rompemos la coincidencia con la whitelist del Sandbox.
+    // En producción, esto debería revisarse (ya que móviles reales necesitan el 9).
     
-    // El conflicto es: 
-    // - Lista Permitidos (Sandbox) muestra: +54 ... 15 ...
-    // - API Envío exige: +54 9 ... (y sin 15).
-    
-    // Si la API rechaza "+54 9..." diciendo que no está en la lista de permitidos, es porque
-    // internamente el Sandbox NO es capaz de mapear el número "fijo/local" (+54 ... 15) con el E.164 (+54 9 ...).
-    
-    // ESTRATEGIA:
-    // 1. Intentar construir el formato E.164 (Estándar) -> +54 9 ...
-    // 2. [ACTUALIZACIÓN] El usuario indica que Meta Sandbox verifica números CON '15'.
-    //    Si removemos el '15', el número enviado (+54 9 ... 5555) no coincide con la lista blanca (+54 ... 15 5555).
-    //    Por lo tanto, NO debemos quitar el '15' si estamos en un entorno donde eso importa.
-    
-    // Sin embargo, para producción real de WhatsApp API, el '15' NO debe ir y el '9' SÍ.
-    // Esto crea un conflicto entre Sandbox (con 15) y Producción (sin 15).
-    
-    // Solución pragmática solicitada por el usuario:
-    // "Usa como te indica META".
-    // Si Meta verificó con 15, enviemos con 15, PERO asegurando el 9 si es móvil.
-    // OJO: La API suele rechazar el 15.
-    
-    // Vamos a probar enviar el número tal cual el usuario lo ingresó (o como Meta lo muestra)
-    // PERO con el +549 adelante. 
-    // Es decir: +54 9 2324 15 50... 
-    // A ver si la API "traga" el 15 siendo parte del número.
-    
-    // Comentamos la eliminación del 15.
-    /*
-    let processedRest = rest;
-    const index15 = processedRest.indexOf("15");
-    if (index15 >= 2 && index15 <= 5) { 
-       processedRest = processedRest.slice(0, index15) + processedRest.slice(index15 + 2);
-    }
-    return "+549" + processedRest;
-    */
-   
-    // Simplemente agregamos el 9. Dejamos el 15 si está.
-    return "+549" + rest;
+    // Devolvemos el número limpio (+54...) pero sin alterar la estructura interna.
+    return "+54" + rest; 
   }
 
   return cleaned;
