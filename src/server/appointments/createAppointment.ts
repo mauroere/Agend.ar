@@ -338,4 +338,14 @@ export async function createAppointmentForTenant(options: {
         appointment_id: (appt as AppointmentRow).id,
         patient_id: patientId,
       });
-   
+    } catch (err) {
+      logError("appointment.created_notification_failed", {
+        tenant_id: tenantId,
+        appointment_id: (appt as AppointmentRow).id,
+        error: (err as Error)?.message ?? String(err),
+      });
+    }
+  }
+
+  return { appointment: appt };
+}
