@@ -1,4 +1,3 @@
-
 -- 0007_add_provider_metadata.sql
 
 alter table public.agenda_providers 

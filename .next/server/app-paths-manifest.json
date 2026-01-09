@@ -1,7 +1,7 @@
 {
-  "/today/page": "app/today/page.js",
-  "/patients/page": "app/patients/page.js",
-  "/settings/page": "app/settings/page.js",
+  "/api/availability/route": "app/api/availability/route.js",
+  "/api/appointments/route": "app/api/appointments/route.js",
   "/calendar/page": "app/calendar/page.js",
-  "/book/[tenantId]/page": "app/book/[tenantId]/page.js"
+  "/today/page": "app/today/page.js",
+  "/api/appointments/[id]/confirm/route": "app/api/appointments/[id]/confirm/route.js"
 }

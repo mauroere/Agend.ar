@@ -1,4 +1,3 @@
-
 -- 0006_add_availability_blocks.sql
 
 -- Table for time blocks (vacations, breaks, etc.)
