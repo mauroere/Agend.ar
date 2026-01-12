@@ -1,5 +1,6 @@
 export const TEMPLATE_NAMES = {
   appointmentCreated: "appointment_created",
+  appointmentConfirmed: "appointment_confirmed",
   reminder24h: "reminder_24h",
   reminder2h: "reminder_2h",
   waitlistOffer: "waitlist_offer",
@@ -15,6 +16,8 @@ export type TemplateRunContext = {
 export const templatePreview = {
   [TEMPLATE_NAMES.appointmentCreated]:
     "Hola {{1}}, agendamos tu turno para {{2}} a las {{3}} en {{4}}. Respondé 1 Confirmar · 2 Reprogramar · 3 Cancelar · STOP para salir.",
+  [TEMPLATE_NAMES.appointmentConfirmed]:
+    "¡Turno confirmado {{1}}! Te esperamos el {{2}} a las {{3}}. Gracias por confirmar.",
   [TEMPLATE_NAMES.reminder24h]:
     "Recordatorio {{1}} mañana {{2}}. Respondé 1 Confirmar · 2 Reprogramar · 3 Cancelar · STOP.",
   [TEMPLATE_NAMES.reminder2h]:

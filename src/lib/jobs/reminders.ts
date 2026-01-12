@@ -11,6 +11,10 @@ type ReminderAppointment = Database["public"]["Tables"]["agenda_appointments"]["
     Database["public"]["Tables"]["agenda_patients"]["Row"],
     "id" | "full_name" | "phone_e164" | "opt_out"
   > | null;
+  agenda_locations: Pick<
+    Database["public"]["Tables"]["agenda_locations"]["Row"],
+    "timezone" | "name"
+  > | null;
 };
 
 export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
@@ -21,8 +25,8 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
 
   const { data: appointments, error } = await serviceClient
     .from("agenda_appointments")
-    .select("id, tenant_id, patient_id, start_at, status, agenda_patients:patient_id(full_name, phone_e164, opt_out)")
-    .eq("status", "confirmed")
+    .select("id, tenant_id, patient_id, start_at, status, agenda_patients:patient_id(full_name, phone_e164, opt_out), agenda_locations:location_id(timezone, name)")
+    .in("status", ["confirmed", "pending"])
     .gte("start_at", windowStart.toISOString())
     .lte("start_at", windowEnd.toISOString())
     .returns<ReminderAppointment[]>();
@@ -36,6 +40,9 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
   for (const appt of appointments ?? []) {
     const patient = appt.agenda_patients;
     if (!patient || patient.opt_out) continue;
+
+    const locationName = appt.agenda_locations?.name ?? "";
+    const timeZone = appt.agenda_locations?.timezone ?? "America/Argentina/Buenos_Aires";
 
     const minutesLeft = differenceInMinutes(new Date(appt.start_at), now);
     if (minutesLeft < (hoursAhead * 60 - 20) || minutesLeft > (hoursAhead * 60 + 20)) {
@@ -81,11 +88,23 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
 
     const templateOverride = templates?.get(templateKey)?.metaTemplateName ?? null;
 
+    // Format Date with Timezone
+    const apptDate = new Date(appt.start_at);
+    // Use Intl for better formatting if needed, or simple toLocaleString with timezone
+    // Note: toLocaleString("es-AR") uses d/M/yyyy H:mm:ss by default.
+    // We want a friendly format: "Viernes 20 de Octubre a las 15:30"
+    const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long', timeZone };
+    const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone };
+    
+    const dateStr = apptDate.toLocaleDateString("es-AR", dateOptions);
+    const timeStr = apptDate.toLocaleTimeString("es-AR", timeOptions);
+    const dateTimeStr = `${dateStr} a las ${timeStr}`;
+
     try {
       await sendTemplateMessage({
         to: patient.phone_e164,
         template: templateKey,
-        variables: [patient.full_name, new Date(appt.start_at).toLocaleString("es-AR")],
+        variables: [patient.full_name, dateTimeStr, locationName],
         nameOverride: templateOverride,
         credentials,
       });
@@ -99,7 +118,7 @@ export async function runReminderJob({ hoursAhead }: { hoursAhead: 24 | 2 }) {
           direction: "out",
           type: templateKey,
           status: "sent",
-          payload_json: { hoursAhead },
+          payload_json: { hoursAhead, template: templateKey, variables: [patient.full_name, dateTimeStr] },
         });
 
       logInfo("reminder.sent", {

@@ -268,10 +268,10 @@ export async function createAppointmentForTenant(options: {
     start_at: startAt.toISOString(),
     end_at: endAt.toISOString(),
     status: "pending",
-    // service_id: resolvedService?.id ?? null, // DISABLED: DB schema cache error
-    // provider_id: resolvedProvider?.id ?? null, // DISABLED: DB column missing
+    service_id: resolvedService?.id ?? null,
+    provider_id: providerId ?? null,
     service_name: normalizedServiceName,
-    // service_snapshot: serviceSnapshot, // DISABLED: DB schema cache error
+    // service_snapshot: serviceSnapshot, // TODO: Run migration to add this column
     internal_notes: notes ?? null,
   } satisfies AppointmentInsert;
 
@@ -298,21 +298,16 @@ export async function createAppointmentForTenant(options: {
         throw new Error("WhatsApp integration missing for tenant");
       }
 
-      // TEMPORARY FALLBACK: Force hello_world for testing connectivity
-      let templateToSend = "hello_world"; // Use the only existing template
-      let variablesToSend: string[] | undefined = undefined; // hello_world takes no vars
-
-      /* 
-      // REAL LOGIC (Commented out until 'appointment_created' template is made in Meta)
-      let templateToSend = templateMap.get(TEMPLATE_NAMES.appointmentCreated)?.metaTemplateName ?? TEMPLATE_NAMES.appointmentCreated;
-      let variablesToSend = [
+      // REAL LOGIC: Use configured template or default to system name
+      const templateKey = TEMPLATE_NAMES.appointmentCreated;
+      const templateToSend = templateMap?.get(templateKey)?.metaTemplateName ?? templateKey;
+      
+      const variablesToSend = [
           patient,
-          startAt.toLocaleDateString("es-AR"),
-          startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-          locationName,
-          locationName 
-        ];
-      */
+          startAt.toLocaleDateString("es-AR", { day: 'numeric', month: 'long', timeZone: locationTimezone }),
+          startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: locationTimezone }),
+          locationName ?? "nuestro consultorio",
+      ];
 
       console.log(`[AppointmentCreation] Sending WhatsApp to ${normalizedPhone} (Template: ${templateToSend})`);
 
@@ -321,7 +316,7 @@ export async function createAppointmentForTenant(options: {
         template: templateToSend,
         variables: variablesToSend,
         credentials,
-        languageCode: "en_US" // hello_world is US English
+        languageCode: "es"
       });
 
       await db.from("agenda_message_log").insert({

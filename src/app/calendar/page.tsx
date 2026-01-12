@@ -85,21 +85,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
   const activeLocationId = searchParams.location && locations.some((l) => l.id === searchParams.location)
     ? searchParams.location
     : locations[0]?.id;
-  /*
-  // TEMPORARILY REMOVED service_id, provider_id due to schema mismatch in DB
-  let appointmentQuery = db
-    .from("agenda_appointments")
-    .select(
-      "id, start_at, end_at, status, location_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
-    )
-    .eq("tenant_id", tenantId);
-  */
-  
-  // Using explicit query to avoid "column does not exist" error
+
   const { data, error } = await db
     .from("agenda_appointments")
     .select(
-      "id, start_at, end_at, status, location_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
+      "id, start_at, end_at, status, location_id, service_id, provider_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
     )
     .eq("tenant_id", tenantId)
     .gte("start_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Fetch last 30 days
@@ -117,11 +107,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     status: asAppointmentStatus(appt.status),
     phone: appt.agenda_patients?.phone_e164 ?? "",
     locationId: appt.location_id ?? undefined,
+    serviceId: appt.service_id ?? undefined,
+    providerId: appt.provider_id ?? undefined,
     service: appt.service_name ?? "",
-    // Disabled IDs to match patched fetch query
-    serviceId: undefined, // appt.service_id ?? undefined,
-    providerId: undefined, // appt.provider_id ?? undefined,
-    notes: appt.internal_notes ?? "",
+    notes: appt.internal_notes ?? undefined,
   }));
 
   const locationOptions = locations.map((l) => ({ id: l.id, name: l.name }));

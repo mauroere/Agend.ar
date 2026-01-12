@@ -40,12 +40,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const body = await request.json();
-  const { patient, phone, start, duration, service, notes, location_id, serviceId, providerId } = body ?? {};
+  const { patient, phone, start, duration, service, notes, location_id, serviceId, providerId, status } = body ?? {};
   const payload = (body ?? {}) as Record<string, unknown>;
   const hasServiceId = Object.prototype.hasOwnProperty.call(payload, "serviceId");
   const hasProviderId = Object.prototype.hasOwnProperty.call(payload, "providerId");
 
-  if (!patient || !phone || !start) {
+  // If we are just updating status, we might not need everything else, but for now let's keep validation loose or check context
+  if ((!patient || !phone || !start) && !status) {
     return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
   }
 
@@ -69,14 +70,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         | "status"
         | "patient_id"
         | "service_name"
-        // | "service_id" // Removed
-        // | "service_snapshot" // Removed
-        // | "provider_id" // Removed
       >
     | null;
 
   if (fetchError || !typedExisting) {
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+  }
+
+  // Handle status-only update immediately if other fields are missing
+  if (status && (!patient && !start)) {
+      const { error: updateError } = await db
+        .from("agenda_appointments")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", appointmentId)
+        .eq("tenant_id", tenantId);
+
+      if (updateError) {
+          return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, id: appointmentId });
   }
 
   const startAt = new Date(start);
@@ -296,17 +308,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     serviceName = manualServiceName;
   }
 
-  const updatePayload = {
+  const updatePayload: AppointmentUpdate = {
     location_id: locationId,
     patient_id: patientId,
-    start_at: startAt.toISOString(),
-    end_at: endAt.toISOString(),
-    // service_id: nextServiceId, // Removed
-    // provider_id: nextProviderId, // Removed
+    start_at: startAt ? startAt.toISOString() : typedExisting.start_at,
+    end_at: endAt ? endAt.toISOString() : typedExisting.end_at,
     service_name: serviceName,
-    // service_snapshot: serviceSnapshot, // Removed
     internal_notes: notes ?? null,
-  } satisfies AppointmentUpdate;
+  };
+
+  if (status) {
+      updatePayload.status = status;
+  }
 
   const { error: updateError, data: updated } = await db
     .from("agenda_appointments")

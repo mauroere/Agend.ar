@@ -22,6 +22,7 @@ export type AvailabilityData = {
     start_at: string;
     end_at: string;
     provider_id: string | null;
+    location_id: string | null;
   }>;
 };
 
@@ -130,24 +131,26 @@ export async function fetchAvailabilityData(
       console.error("[getSlots] Appointments Unexpected Error:", e);
   }
 
+
   // Fetch Blocks
   let blocks: any[] = [];
-  try {
+  // try {
     const { data: blocksData, error: blocksError } = await db
       .from("agenda_availability_blocks" as any)
-      .select("start_at, end_at, provider_id")
+      .select("start_at, end_at, provider_id, location_id")
       .eq("tenant_id", tenantId)
       .gte("end_at", startRange.toISOString())
       .lte("start_at", endRange.toISOString());
     
     if (blocksError) {
-        console.warn("[getSlots] Blocks Fetch Error:", blocksError);
+        console.error("[getSlots] Blocks Fetch Error:", blocksError);
     } else {
         blocks = blocksData ?? [];
     }
-  } catch (e) {
-    console.warn("Availability blocks table might be missing or error", e);
-  }
+  // } catch (e) {
+  //   console.error("Availability blocks fetch failed", e);
+  // }
+
 
   return { 
     appointments: appointments ?? [], 
@@ -222,9 +225,27 @@ export function calculateDailySlots(
   });
 
   const blockingBlocks = blocks.filter((b) => {
+    // 1. Check Location Scope
+    // If the block is specific to a location, it only blocks that location.
+    if (b.location_id && b.location_id !== locationId) {
+        return false;
+    }
+
+    // 2. Check Provider Scope
+    // If the block is "Global" (no provider), it blocks everyone.
     if (!b.provider_id) return true;
-    if (providerId) return b.provider_id === providerId;
-    return false;
+    
+    // If the request is for a specific provider, check if it matches.
+    if (providerId) {
+        return b.provider_id === providerId;
+    }
+    
+    // CRITICAL FIX:
+    // If providerId is NOT filtering (Any Provider), the current "Single Resource" logic for appointments
+    // (where any appointment blocks the location) suggests we should treat Blocks similarly for safety.
+    // If one provider is blocked, we block the slot to prevent "False Availability" in single-provider contexts.
+    // Ideally query valid providers, but "Block All" is safer than "Block None".
+    return true;
   });
 
   const slots: string[] = [];

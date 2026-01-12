@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UploadDropzone } from "@/components/uploader/UploadDropzone";
 import { Loader2, Plus, UserCheck, Edit3, Clock, CalendarOff } from "lucide-react";
 import { ProviderBlocksDialog } from "./ProviderBlocksDialog";
+import { WeeklyScheduleEditor, WeeklyScheduleState, DEFAULT_WEEKLY_SCHEDULE } from "./WeeklyScheduleEditor";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -22,6 +23,7 @@ const EMPTY_FORM = {
   useCustomSchedule: false,
   customStart: "09:00",
   customEnd: "18:00",
+  weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
   serviceIds: [] as string[],
 };
 
@@ -89,21 +91,39 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
   const handleOpen = (provider?: ProviderRecord) => {
     if (provider) {
       setEditingId(provider.id);
-      const schedule = provider.metadata?.schedule?.mon?.[0]; // Simple check if custom schedule exists
+      
+      // Parse schedule
+      const existingSchedule = provider.metadata?.schedule || {};
+      const hasCustomSchedule = Object.keys(existingSchedule).length > 0;
+      
+      const parsedSchedule: WeeklyScheduleState = { ...DEFAULT_WEEKLY_SCHEDULE };
+      
+      if (hasCustomSchedule) {
+        (["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const).forEach(day => {
+            const ranges = existingSchedule[day];
+            if (Array.isArray(ranges) && ranges.length > 0) {
+               parsedSchedule[day] = { active: true, start: ranges[0][0], end: ranges[0][1] };
+            } else {
+               parsedSchedule[day] = { ...DEFAULT_WEEKLY_SCHEDULE[day], active: false };
+            }
+        });
+      }
+
       setForm({
         fullName: provider.full_name,
         bio: provider.bio ?? "",
         avatarUrl: provider.avatar_url ?? "",
         defaultLocationId: provider.default_location_id ?? locations[0]?.id ?? "",
         specialties: provider.specialties.join(", "),
-        useCustomSchedule: !!schedule,
-        customStart: schedule?.[0] ?? "09:00",
-        customEnd: schedule?.[1] ?? "18:00",
+        useCustomSchedule: hasCustomSchedule,
+        customStart: "09:00",
+        customEnd: "18:00",
+        weeklySchedule: parsedSchedule,
         serviceIds: provider.serviceIds ?? [],
       });
     } else {
       setEditingId(null);
-      setForm({ ...EMPTY_FORM, defaultLocationId: locations[0]?.id ?? "" });
+      setForm({ ...EMPTY_FORM, defaultLocationId: locations[0]?.id ?? "", weeklySchedule: DEFAULT_WEEKLY_SCHEDULE });
     }
     setDialogOpen(true);
   };
@@ -115,12 +135,15 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
       let metadata = {};
       
       if (form.useCustomSchedule) {
-         const hours = [[form.customStart, form.customEnd]];
-         metadata = {
-            schedule: {
-               mon: hours, tue: hours, wed: hours, thu: hours, fri: hours
+         const schedule: Record<string, string[][]> = {};
+         Object.entries(form.weeklySchedule).forEach(([day, val]) => {
+            if (val.active) {
+               schedule[day] = [[val.start, val.end]];
+            } else {
+               schedule[day] = []; 
             }
-         };
+         });
+         metadata = { schedule };
       }
 
       const payload = {
@@ -188,12 +211,12 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 space-y-0">
         <div>
           <CardTitle>Equipo & Profesionales</CardTitle>
           <CardDescription>Asigna responsables para cada tratamiento.</CardDescription>
         </div>
-        <Button onClick={() => handleOpen()}>
+        <Button onClick={() => handleOpen()} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Nuevo profesional
         </Button>
       </CardHeader>
@@ -311,23 +334,11 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
                </div>
                
                {form.useCustomSchedule && (
-                  <div className="ml-6 grid grid-cols-2 gap-4">
-                     <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Inicio (Lun-Vie)</Label>
-                        <Input 
-                           type="time" 
-                           value={form.customStart} 
-                           onChange={(e) => setForm(prev => ({ ...prev, customStart: e.target.value }))}
-                        />
-                     </div>
-                     <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Fin (Lun-Vie)</Label>
-                        <Input 
-                           type="time" 
-                           value={form.customEnd}
-                           onChange={(e) => setForm(prev => ({ ...prev, customEnd: e.target.value }))}
-                        />
-                     </div>
+                  <div className="mt-4 sm:ml-6 ml-0">
+                     <WeeklyScheduleEditor 
+                        value={form.weeklySchedule} 
+                        onChange={(val) => setForm(prev => ({ ...prev, weeklySchedule: val }))} 
+                     />
                   </div>
                )}
                {!form.useCustomSchedule && (

@@ -12,6 +12,7 @@ import { UploadDropzone } from "@/components/uploader/UploadDropzone";
 import { cn } from "@/lib/utils";
 
 const defaultBranding = {
+  companyDisplayName: "",
   heroTitle: "Mostrá tus turnos en vivo",
   heroSubtitle: "Tus pacientes reservan en segundos. Sin mensajes, sin planillas.",
   heroTagline: "Agenda automática",
@@ -94,6 +95,7 @@ export function MicrositeSettings() {
           ...prev,
           publicSlug: tenant?.publicSlug ?? "",
           customDomain: tenant?.customDomain ?? "",
+          companyDisplayName: tenant?.metadata?.companyDisplayName ?? "",
           heroTitle: tenant?.metadata?.heroTitle ?? defaultBranding.heroTitle,
           heroSubtitle: tenant?.metadata?.heroSubtitle ?? defaultBranding.heroSubtitle,
           heroTagline: tenant?.metadata?.heroTagline ?? defaultBranding.heroTagline,
@@ -141,6 +143,7 @@ export function MicrositeSettings() {
         publicSlug: form.publicSlug,
         customDomain: form.customDomain,
         metadata: {
+          companyDisplayName: form.companyDisplayName,
           heroTitle: form.heroTitle,
           heroSubtitle: form.heroSubtitle,
           heroTagline: form.heroTagline,
@@ -309,14 +312,28 @@ export function MicrositeSettings() {
 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-3">
-            <Label htmlFor="heroTitle" className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-slate-500" /> Título principal
+            <Label htmlFor="companyDisplayName" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-slate-500" /> Nombre de la empresa
             </Label>
+            <Input
+              id="companyDisplayName"
+              value={form.companyDisplayName}
+              onChange={(event) => updateField("companyDisplayName", event.target.value)}
+              placeholder="Ej: Clínica Belgrano"
+            />
+          </div>
+          <div className="space-y-3">
+            <Label htmlFor="heroTitle">Título principal</Label>
             <Input
               id="heroTitle"
               value={form.heroTitle}
               onChange={(event) => updateField("heroTitle", event.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-3">
             <Label htmlFor="heroSubtitle">Descripción</Label>
             <Textarea
               id="heroSubtitle"

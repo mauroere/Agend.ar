@@ -7,6 +7,7 @@ import { ServicesSettings } from "@/components/settings/ServicesSettings";
 import { ProvidersSettings } from "@/components/settings/ProvidersSettings";
 import { MicrositeSettings } from "@/components/settings/MicrositeSettings";
 import { LocationsSettings } from "@/components/settings/LocationsSettings";
+import { MessageLogsSettings } from "@/components/settings/MessageLogsSettings";
 import { requireTenantSession } from "@/server/auth";
 
 type LocationRow = Pick<
@@ -35,6 +36,7 @@ export default async function SettingsPage() {
         <AutopilotSettings />
         <UsersSettings />
         <IntegrationsSettings />
+        <MessageLogsSettings />
       </div>
     </Shell>
   );

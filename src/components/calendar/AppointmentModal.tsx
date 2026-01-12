@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 // Assuming component primitives exist or standard HTML
-import { X, Loader2, Calendar as CalendarIcon, Clock, Check, UserPlus, Search, Info, Sparkles } from "lucide-react";
+import { X, Loader2, Calendar as CalendarIcon, Clock, Check, UserPlus, Search, Info, Sparkles, Trash2, Ban } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { CreatePatientDialog } from "@/components/patients/CreatePatientDialog";
@@ -360,6 +360,33 @@ export function AppointmentModal({ locations, services, providers, open: control
 		}
 	};
 
+  const handleCancelAppointment = async () => {
+      if (!appointment || !confirm("¿Seguro que querés cancelar este turno? Se notificará al paciente si corresponde.")) return;
+
+      setLoading(true);
+      try {
+          const response = await fetch(`/api/appointments/${appointment.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "canceled" }), 
+          });
+
+          if (!response.ok) {
+             const res = await response.json();
+             setError(res.error || "No se pudo cancelar");
+             return;
+          }
+
+          setOpen(false);
+          router.refresh();
+      } catch (e) {
+          console.error(e);
+          setError("Error al cancelar");
+      } finally {
+          setLoading(false);
+      }
+  };
+
   // Render logic
 
 	if (controlledOpen === undefined && !open) {
@@ -375,7 +402,7 @@ export function AppointmentModal({ locations, services, providers, open: control
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto w-full p-0 gap-0">
-          <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50/50">
              <DialogHeader>
                <DialogTitle className="text-xl text-slate-900">{isEdit ? "Editar Turno" : "Agendar Nuevo Turno"}</DialogTitle>
                <DialogDescription className="text-slate-500">Complete la información del paciente y seleccione un bloque horario.</DialogDescription>
@@ -384,7 +411,7 @@ export function AppointmentModal({ locations, services, providers, open: control
           
           <form onSubmit={handleSubmit} className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
              {/* Left Column: Intake */}
-             <div className="flex-1 p-6 space-y-6">
+             <div className="flex-1 p-4 md:p-6 space-y-6">
                 {error && (
                   <div className="flex items-center gap-2 p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
                     <Info className="h-4 w-4" />
@@ -655,7 +682,7 @@ export function AppointmentModal({ locations, services, providers, open: control
              </div>
 
              {/* Right Column: Scheduler */}
-             <div className="flex-1 p-6 bg-slate-50/30 flex flex-col gap-6">
+             <div className="flex-1 p-4 md:p-6 bg-slate-50/30 flex flex-col gap-6">
                 <div className="flex flex-col gap-2">
                    <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                      <CalendarIcon className="h-4 w-4" /> Fecha
@@ -753,12 +780,29 @@ export function AppointmentModal({ locations, services, providers, open: control
              </div>
           </form>
 
-          <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
-             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-             <Button type="submit" onClick={handleSubmit} disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEdit ? "Guardar Cambios" : "Confirmar Turno"}
-             </Button>
+          <div className="p-4 border-t bg-slate-50 flex justify-between items-center gap-2">
+             <div>
+                {isEdit && appointment?.status !== 'canceled' && (
+                    <Button 
+                        type="button" 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={handleCancelAppointment}
+                        disabled={loading}
+                        className="bg-red-100 text-red-700 hover:bg-red-200 border-none shadow-none"
+                    >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Anular Turno
+                    </Button>
+                )}
+             </div>
+             <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cerrar</Button>
+                <Button type="submit" onClick={handleSubmit} disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isEdit ? "Guardar Cambios" : "Confirmar Turno"}
+                </Button>
+             </div>
           </div>
         </DialogContent>
       </Dialog>

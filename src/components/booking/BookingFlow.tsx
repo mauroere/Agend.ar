@@ -44,6 +44,7 @@ type BookingFlowProps = {
   accentColor?: string;
   accentGradient?: string;
   ctaLabel?: string;
+  whatsappLink?: string | null;
 };
 
 type DurationFilterId = "express" | "standard" | "extended";
@@ -105,7 +106,7 @@ function formatPrice(service: BookingService | null) {
   return formatter.format(service.price_minor_units / 100);
 }
 
-export function BookingFlow({ tenantId, tenantName, services, providers, locations, accentColor, accentGradient, ctaLabel }: BookingFlowProps) {
+export function BookingFlow({ tenantId, tenantName, services, providers, locations, accentColor, accentGradient, ctaLabel, whatsappLink }: BookingFlowProps) {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(services[0]?.id ?? null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>(locations[0]?.id ?? "");
@@ -291,64 +292,101 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
   const wizardStages = [
     {
       id: 1 as const,
-      title: "Tratamiento + agenda",
-      helper: "Elegí tu servicio, profesional y horario disponible.",
+      title: "Tratamientos disponibles",
+      helper: "Seleccioná la experiencia que buscás.",
     },
     {
       id: 2 as const,
       title: "Tus datos",
-      helper: "Completá WhatsApp y elegí si querés recordatorios.",
+      helper: "Información de contacto.",
     },
     {
       id: 3 as const,
       title: "Confirmación",
-      helper: "Te enviamos el resumen automáticamente por WhatsApp.",
+      helper: "Resumen de tu reserva.",
     },
   ];
+
   const canAdvanceStageOne = Boolean(selectedService && selectedDate && selectedSlot);
   const canSubmitStageTwo = Boolean(patientName.trim() && patientPhone.trim() && selectedSlot);
 
   const SummaryCard = () => (
-    <section className="rounded-[32px] border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50">
-      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Resumen en tiempo real</p>
-      <div className="mt-4 space-y-4 text-sm text-slate-600">
-        <div>
-          <p className="text-xs text-slate-400">Tratamiento</p>
-          <p className="text-base font-semibold text-slate-900">{selectedService?.name ?? "Elegí un servicio"}</p>
-          <p className="text-sm text-slate-500">{formatPrice(selectedService)}</p>
+    <section className="rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-[0_10px_30px_rgba(203,213,225,0.3)] transition-all hover:shadow-[0_15px_40px_rgba(203,213,225,0.4)]">
+      <h3 className="mb-4 text-base font-bold text-slate-800 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-indigo-500">
+           <path fillRule="evenodd" d="M7.5 6v.75H5.513c-.96 0-1.764.724-1.865 1.679l-1.263 12A1.875 1.875 0 004.25 22.5h15.5a1.875 1.875 0 001.865-2.071l-1.263-12a1.875 1.875 0 00-1.865-1.679H16.5V6a4.5 4.5 0 10-9 0zM12 3a3 3 0 00-3 3v.75h6V6a3 3 0 00-3-3zm-3 8.25a3 3 0 106 0v-.75a.75.75 0 011.5 0v.75a4.5 4.5 0 11-9 0v-.75a.75.75 0 011.5 0v.75z" clipRule="evenodd" />
+        </svg>
+        Tu reserva
+      </h3>
+      
+      <div className="space-y-4">
+        <div className="group relative overflow-hidden rounded-2xl bg-slate-50 p-4 transition-colors hover:bg-indigo-50/50">
+          <div className="flex items-center gap-3">
+             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                </svg>
+             </div>
+             <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Servicio</p>
+                <p className="text-sm font-bold text-slate-900 leading-snug">{selectedService?.name ?? "Elegir..."}</p>
+             </div>
+          </div>
+          {selectedService && <p className="mt-2 pl-[52px] text-xs font-medium text-indigo-600">{formatPrice(selectedService)}</p>}
         </div>
-        <div>
-          <p className="text-xs text-slate-400">Profesional</p>
-          <p className="text-base text-slate-900">{providerDescription}</p>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-slate-50 p-4 transition-colors hover:bg-indigo-50/50">
+          <div className="flex items-center gap-3">
+             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-emerald-500 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+             </div>
+             <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Profesional</p>
+                <p className="text-sm font-bold text-slate-900 leading-snug">{selectedProvider ? selectedProvider.full_name : "Sin preferencia"}</p>
+             </div>
+          </div>
         </div>
-        <div>
-          <p className="text-xs text-slate-400">Sede</p>
-          <p className="text-base text-slate-900">{selectedLocation?.name ?? "Seleccioná una sede"}</p>
-          {selectedLocation?.address && <p className="text-xs text-slate-400">{selectedLocation.address}</p>}
-        </div>
-        <div>
-          <p className="text-xs text-slate-400">Fecha</p>
-          <p className="text-base text-slate-900">
-            {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : "Elegí un día"}
-          </p>
-          <p className="text-sm text-slate-500">{selectedSlot ? `${selectedSlot} hs` : "Elegí horario"}</p>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-slate-50 p-4 transition-colors hover:bg-indigo-50/50">
+          <div className="flex items-center gap-3">
+             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+             </div>
+             <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">¿Cuándo?</p>
+                <p className="text-sm font-bold text-slate-900 leading-snug">
+                   {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : "Elegir fecha..."}
+                </p>
+             </div>
+          </div>
+          {selectedSlot && (
+             <p className="mt-2 pl-[52px] text-xs font-bold text-slate-700 bg-white/50 w-fit px-2 py-0.5 rounded-md border border-slate-200/50">
+                 {selectedSlot} hs
+             </p>
+          )}
         </div>
       </div>
-      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-        Al confirmar te llega un WhatsApp con toda la info y un link para reprogramar si lo necesitás.
+      
+      <div className="mt-6 pt-4 border-t border-slate-100">
+         <p className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            Reserva segura vía WhatsApp
+         </p>
       </div>
     </section>
   );
 
   const HelperCard = () => (
-    <section className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 text-sm text-slate-600">
-      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">¿Cómo funciona?</p>
-      <ul className="mt-3 space-y-2">
-        <li>• Cada cambio actualiza la agenda y el resumen automáticamente.</li>
-        <li>• Si no hay horario, probá con otro profesional o sede.</li>
-        <li>• Podés responder al WhatsApp para reprogramar en segundos.</li>
-      </ul>
-    </section>
+    <div className="mt-6 rounded-2xl bg-slate-100/50 p-4 border border-slate-100 hidden lg:block">
+        <p className="text-sm font-medium text-slate-600">
+           <span className="mr-2 text-lg">✨</span>
+           Estamos listos para recibirte. Si tenés dudas, completá la reserva y avisanos por chat.
+        </p>
+    </div>
   );
 
   const handleRestart = () => {
@@ -362,76 +400,74 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
   };
 
   return (
-    <div id="catalog" className="space-y-8 scroll-mt-24 text-slate-900">
-      <section className="rounded-[36px] border border-slate-100 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
-        <div className="grid gap-4 md:grid-cols-3">
-          {wizardStages.map((step) => {
-            const status = stage === step.id ? "current" : stage > step.id ? "done" : "upcoming";
-            return (
-              <button
-                key={step.id}
-                type="button"
-                disabled={step.id >= stage}
-                onClick={() => {
-                  if (step.id < stage) {
-                    setStage(step.id);
-                    setError(null);
-                    if (step.id < 3) {
-                      setSuccess(null);
-                      setLastBookingSummary(null);
-                    }
-                  }
-                }}
-                className={cn(
-                  "rounded-3xl border px-5 py-4 text-left transition",
-                  status === "current" && "border-slate-900 bg-slate-900 text-white shadow-xl",
-                  status === "done" && "border-emerald-200 bg-emerald-50/60 text-emerald-700 shadow-inner",
-                  status === "upcoming" && "border-slate-100 bg-slate-50 text-slate-600"
-                )}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4em]">Paso {step.id.toString().padStart(2, "0")}</p>
-                <p className="mt-2 text-lg font-semibold">{step.title}</p>
-                <p className="text-xs text-slate-500">{step.helper}</p>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+    <div id="booking-flow" className="space-y-8 text-slate-900">
+      {/* Mobile Steps Indicator - Simplified */}
+      <div className="md:hidden">
+         <div className="flex gap-2">
+            {[1, 2, 3].map(s => (
+                <div key={s} className={cn("h-1.5 flex-1 rounded-full transition-all duration-500", s <= stage ? "bg-slate-900" : "bg-slate-200")} />
+            ))}
+         </div>
+         <p className="mt-3 text-lg font-bold text-slate-900">{wizardStages[stage-1].title}</p>
+      </div>
+
+      {/* Desktop Simple Tabs */}
+      <div className="hidden md:flex justify-center mb-12">
+          <div className="inline-flex rounded-full bg-slate-100 p-1.5">
+              {wizardStages.map((step) => (
+                  <button
+                    key={step.id}
+                    onClick={() => {
+                        if (step.id < stage) setStage(step.id);
+                    }}
+                    disabled={step.id > stage}
+                    className={cn(
+                        "rounded-full px-6 py-2 text-sm font-semibold transition-all duration-300",
+                        stage === step.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
+                        step.id > stage && "opacity-50 cursor-not-allowed hover:text-slate-500"
+                    )}
+                  >
+                      {step.title}
+                  </button>
+              ))}
+          </div>
+      </div>
 
       {stage === 1 && (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr),320px]">
-          <div className="space-y-8">
-            <section className="rounded-[32px] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/60">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="grid gap-8 lg:grid-cols-[1fr,380px]">
+          <div className="space-y-12">
+            {/* Tratamiento */}
+            <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-slate-400">Etapa 1 · Tratamiento</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-900">Elegí qué querés hacerte</h3>
-                  <p className="text-sm text-slate-500">
-                    {emptyCatalog
-                      ? "Configurá servicios desde el panel administrativo."
-                      : `Mostramos ${filteredServices.length} de ${services.length} experiencias activas.`}
-                  </p>
+                  <h3 className="text-2xl font-bold tracking-tight text-slate-900">Elegí tu experiencia</h3>
+                  <p className="mt-1 text-slate-500">{services.length} opciones disponibles para vos.</p>
                 </div>
-                {!emptyCatalog ? (
-                  <div className="w-full max-w-xs">
-                    <Input
-                      placeholder="Buscar por nombre o beneficio"
-                      value={serviceQuery}
-                      onChange={(event) => setServiceQuery(event.target.value)}
-                      className="h-12 rounded-2xl border-slate-200 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900"
-                    />
-                  </div>
-                ) : null}
+                {!emptyCatalog && (
+                    <div className="relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400">
+                           <path fillRule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" clipRule="evenodd" />
+                        </svg>
+                        <input 
+                           placeholder="Buscar..." 
+                           value={serviceQuery}
+                           onChange={(e) => setServiceQuery(e.target.value)}
+                           className="h-10 w-full min-w-[200px] rounded-full border-none bg-slate-100 pl-10 pr-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                )}
               </div>
 
               {!emptyCatalog ? (
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-8 flex flex-wrap gap-3 pb-2">
                   <button
                     type="button"
                     onClick={() => setDurationFilter(null)}
                     className={cn(
-                      "rounded-full border border-slate-200 px-4 py-2 text-xs uppercase tracking-[0.3em] text-slate-500",
-                      !durationFilter && "border-slate-900 bg-slate-900 text-white"
+                      "rounded-full border px-5 py-2.5 text-xs font-bold uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md",
+                      !durationFilter 
+                        ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
                     )}
                   >
                     Todas
@@ -444,12 +480,14 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                         type="button"
                         onClick={() => setDurationFilter(active ? null : option.id)}
                         className={cn(
-                          "rounded-full border border-slate-200 px-4 py-2 text-left text-xs uppercase tracking-[0.3em] text-slate-500 transition",
-                          active && "border-slate-900 bg-slate-900 text-white"
+                          "rounded-full border px-5 py-2.5 text-left text-xs uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md",
+                          active
+                            ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
                         )}
                       >
-                        <span className="font-semibold">{option.label}</span>
-                        <span className="ml-2 text-[10px] normal-case tracking-normal text-slate-300">{option.helper}</span>
+                        <span className="font-bold">{option.label}</span>
+                        <span className={cn("ml-2 text-[10px] normal-case tracking-normal opacity-70", active ? "text-slate-200" : "text-slate-400")}>{option.helper}</span>
                       </button>
                     );
                   })}
@@ -457,15 +495,15 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
               ) : null}
 
               {emptyCatalog ? (
-                <p className="mt-6 rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500">
-                  Todavía no publicaste tratamientos para {tenantName}. Sumá tu primer servicio para habilitar la agenda.
-                </p>
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+                  <p className="text-lg">No hay tratamientos disponibles en este momento.</p>
+                </div>
               ) : noResults ? (
-                <div className="mt-6 rounded-3xl border border-slate-100 bg-slate-50 p-5 text-sm text-slate-500">
-                  No encontramos tratamientos que coincidan con tu búsqueda.
+                <div className="mt-6 rounded-2xl bg-slate-50 p-8 text-center text-slate-500">
+                  <p className="text-lg">No encontramos resultados para tu búsqueda.</p>
                 </div>
               ) : (
-                <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredServices.map((service, index) => {
                     const isActive = selectedServiceId === service.id;
                     const coverImage =
@@ -477,76 +515,89 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                       typeof service.color === "string" && !service.color.startsWith("http")
                         ? service.color
                         : accent;
+                    
                     return (
                       <button
                         key={service.id}
                         type="button"
                         onClick={() => setSelectedServiceId(service.id)}
                         className={cn(
-                          "group relative flex h-full flex-col overflow-hidden rounded-[30px] border border-slate-100 bg-white pb-6 text-left shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-xl",
-                          isActive && "border-transparent ring-2 ring-offset-2 ring-offset-white"
+                          "group relative flex flex-col overflow-hidden rounded-[2rem] bg-white text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl",
+                          isActive ? "ring-2 ring-slate-900 ring-offset-4" : "shadow-lg shadow-slate-200/50 hover:shadow-slate-200/80"
                         )}
-                        style={isActive ? { boxShadow: `0 25px 65px ${hexToRgba(cardAccent, 0.25)}` } : undefined}
                       >
-                        <div
-                          className="h-36 overflow-hidden rounded-[24px]"
-                          style={{
-                            backgroundImage: `linear-gradient(120deg, rgba(15,23,42,0.15), rgba(15,23,42,0.55)), url(${coverImage})`,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }}
-                        />
-                        <div className="mt-4 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-500">
-                          <span>{service.duration_minutes} MIN</span>
-                          <span>{formatPrice(service)}</span>
+                        <div className="relative h-48 w-full overflow-hidden bg-slate-100">
+                             <div 
+                                className="absolute inset-0 transition-transform duration-700 group-hover:scale-110"
+                                style={{
+                                  backgroundImage: `url(${coverImage})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                }}
+                             />
+                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0" />
+                             
+                             <div className="absolute top-4 right-4 rounded-full bg-white/90 backdrop-blur-sm px-3 py-1 text-xs font-bold text-slate-900 shadow-sm">
+                                {service.duration_minutes} min
+                             </div>
+                             
+                             <div className="absolute bottom-4 left-4 text-white">
+                                <p className="text-xl font-bold tracking-tight">{formatPrice(service)}</p>
+                             </div>
                         </div>
-                        <div className="mt-3 space-y-2">
-                          <p className="text-xl font-semibold text-slate-900">{service.name}</p>
-                          <p className="text-sm text-slate-500 line-clamp-3">
-                            {service.description ?? "Agregá una descripción breve para destacar beneficios."}
+
+                        <div className="flex flex-1 flex-col p-6">
+                           <h4 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">{service.name}</h4>
+                           <p className="text-sm text-slate-500 line-clamp-3 mb-6 flex-1">
+                            {service.description ?? "Una experiencia diseñada para tu bienestar."}
                           </p>
+                          
+                          <div className={cn(
+                             "mt-auto flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-colors",
+                             isActive ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-700"
+                          )}>
+                             <span>{isActive ? "Seleccionado" : "Elegir"}</span>
+                             {isActive ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                                    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                                </svg>
+                             ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                </svg>
+                             )}
+                          </div>
                         </div>
-                        <div className="mt-5 flex items-center justify-between text-xs text-slate-500">
-                          <span>Confirmación inmediata y recordatorios automáticos.</span>
-                          <span
-                            className={cn(
-                              "rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.3em]",
-                              isActive ? "border-slate-900 text-slate-900" : "border-slate-200 text-slate-400"
-                            )}
-                          >
-                            {isActive ? "Seleccionado" : "Reservar"}
-                          </span>
-                        </div>
-                        <span
-                          className="pointer-events-none absolute inset-x-6 bottom-4 h-px"
-                          style={{
-                            background: isActive
-                              ? cardAccent && !cardAccent.startsWith("url")
-                                ? cardAccent
-                                : accentBackgroundValue
-                              : "linear-gradient(90deg, transparent, rgba(15,23,42,0.25), transparent)",
-                          }}
-                        />
                       </button>
                     );
                   })}
                 </div>
               )}
+            </section>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-2">
-                <article className="rounded-[28px] border border-slate-100 bg-slate-50 p-5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-slate-500">Profesional</p>
-                  <h4 className="mt-2 text-lg font-semibold text-slate-900">Elegí quién te atiende</h4>
-                  <div className="mt-4 flex flex-wrap gap-3">
+            {/* Selector de profesional y sede */}
+            <div className="grid gap-6 md:grid-cols-2 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                <div className="rounded-[2rem] bg-slate-50 p-6 sm:p-8">
+                  <h4 className="flex items-center gap-2 text-lg font-bold text-slate-900 mb-6">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm text-slate-400">
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                          <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+                       </svg>
+                    </span>
+                    Profesional
+                  </h4>
+                  <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={() => setSelectedProviderId(null)}
                       className={cn(
-                        "rounded-full border border-slate-200 px-5 py-2 text-sm text-slate-600 transition hover:border-slate-900",
-                        !selectedProviderId && "border-slate-900 bg-slate-900 text-white"
+                        "rounded-full px-5 py-2.5 text-sm font-medium transition-all",
+                        !selectedProviderId 
+                            ? "bg-slate-900 text-white shadow-md" 
+                            : "bg-white text-slate-600 shadow-sm hover:shadow-md hover:text-slate-900"
                       )}
                     >
-                      Sin preferencia
+                      Cualquiera
                     </button>
                     {providers.map((provider) => (
                       <button
@@ -554,65 +605,85 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                         type="button"
                         onClick={() => setSelectedProviderId(provider.id)}
                         className={cn(
-                          "rounded-full border border-slate-200 px-5 py-2 text-sm text-slate-600 transition hover:border-slate-900",
-                          selectedProviderId === provider.id && "border-slate-900 bg-slate-900 text-white"
+                           "rounded-full px-5 py-2.5 text-sm font-medium transition-all",
+                           selectedProviderId === provider.id
+                               ? "bg-slate-900 text-white shadow-md" 
+                               : "bg-white text-slate-600 shadow-sm hover:shadow-md hover:text-slate-900"
                         )}
                       >
                         {provider.full_name}
                       </button>
                     ))}
                   </div>
-                  <p className="mt-3 text-xs text-slate-500">{providerDescription}</p>
-                </article>
+                </div>
 
-                <article className="rounded-[28px] border border-slate-100 bg-slate-50 p-5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-slate-500">Sede</p>
-                  <h4 className="mt-2 text-lg font-semibold text-slate-900">Dónde querés atenderte</h4>
-                  <div className="mt-4 space-y-3">
+                <div className="rounded-[2rem] bg-slate-50 p-6 sm:p-8">
+                  <h4 className="flex items-center gap-2 text-lg font-bold text-slate-900 mb-6">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm text-slate-400">
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                          <path fillRule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                       </svg>
+                    </span>
+                    Sede
+                  </h4>
+                  <div className="relative">
                     <select
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-slate-900"
+                      className="w-full appearance-none rounded-2xl border-none bg-white p-4 pr-10 text-sm font-medium text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-slate-900"
                       value={selectedLocationId}
                       onChange={(event) => setSelectedLocationId(event.target.value)}
                     >
                       {locations.map((location) => (
-                        <option key={location.id} value={location.id} className="bg-white text-slate-900">
+                        <option key={location.id} value={location.id}>
                           {location.name}
                         </option>
                       ))}
                     </select>
-                    {selectedLocation?.address && <p className="text-xs text-slate-500">{selectedLocation.address}</p>}
+                    <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                       </svg>
+                    </div>
                   </div>
-                </article>
-              </div>
-            </section>
-
-            <section className="rounded-[32px] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/60">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-slate-400">Etapa 1 · Agenda</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-900">Elegí fecha y horario disponibles</h3>
-                  <p className="text-sm text-slate-500">Actualizamos la agenda según el tratamiento, profesional y sede que seleccionaste.</p>
+                  {selectedLocation?.address && (
+                      <p className="mt-3 text-sm text-slate-500 ml-1">{selectedLocation.address}</p>
+                  )}
                 </div>
-                <span className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1 text-xs text-slate-600">
-                  {serviceDuration} min
-                </span>
+            </div>
+
+            {/* Calendario y Horarios */}
+            <section className="rounded-[2.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+              <div className="mb-8">
+                  <h3 className="text-2xl font-bold tracking-tight text-slate-900">Agenda</h3>
+                  <p className="mt-1 text-slate-500">Seleccioná el día y la hora que mejor te quede.</p>
               </div>
-              <div className="mt-6 grid gap-6 lg:grid-cols-[360px,1fr]">
-                <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-4">
+
+              <div className="flex flex-col gap-8 lg:flex-row">
+                <div className="flex justify-center lg:justify-start">
                   <Calendar
                     mode="single"
+                    locale={es}
                     selected={selectedDate}
                     onSelect={(date) => setSelectedDate(date ?? undefined)}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                    className="rounded-2xl border border-slate-100 bg-white p-3 text-slate-900"
+                    className="rounded-3xl border-none bg-slate-50/50 p-6 shadow-inner"
+                    classNames={{
+                        day_selected: "bg-slate-900 text-white hover:bg-slate-800 focus:bg-slate-900",
+                        day_today: "bg-slate-100 text-slate-900 font-bold",
+                    }}
                   />
                 </div>
-                <div className="space-y-4">
-                  <div className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Horarios disponibles</p>
-                    <div className="mt-4 flex flex-wrap gap-3">
+                
+                <div className="flex-1">
+                    <div className="mb-4 flex items-center justify-between">
+                         <span className="text-sm font-bold uppercase tracking-wider text-slate-400">Horarios</span>
+                         <span className="text-xs text-slate-400">{serviceDuration} min de duración</span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-4 xl:grid-cols-5">
                       {loadingSlots ? (
-                        <p className="text-sm text-slate-600">Buscando turnos libres...</p>
+                         Array.from({ length: 8 }).map((_, i) => (
+                            <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
+                         ))
                       ) : availableSlots.length > 0 ? (
                         availableSlots.map((slot) => (
                           <button
@@ -620,181 +691,247 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                             type="button"
                             onClick={() => setSelectedSlot(slot)}
                             className={cn(
-                              "rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700 transition",
-                              selectedSlot === slot && "border-slate-900 bg-slate-900 text-white"
+                              "relative flex items-center justify-center rounded-xl p-2 text-sm font-bold transition-all duration-300 border border-transparent min-h-[46px]",
+                              selectedSlot === slot 
+                                ? "bg-slate-900 text-white shadow-md scale-105 z-10" 
+                                : "bg-slate-50 text-slate-700 hover:bg-white hover:border-slate-200 hover:shadow-md hover:-translate-y-1 hover:text-slate-900"
                             )}
                           >
-                            {slot} hs
+                            {slot}
                           </button>
                         ))
                       ) : (
-                        <p className="text-sm text-slate-600">No hay turnos libres en esta fecha.</p>
+                        <div className="col-span-full py-8 text-center">
+                            <p className="text-slate-500">No hay disponibilidad para esta fecha.</p>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-                    Confirmamos al instante y, si activás recordatorios, te avisamos 24 hs antes para que no se te pase.
-                  </div>
                 </div>
               </div>
             </section>
 
-            <div className="rounded-[28px] border border-slate-100 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-slate-500">Con el servicio y horario listos, pasamos a tus datos.</p>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setStage(2);
-                    setError(null);
-                  }}
-                  disabled={!canAdvanceStageOne}
-                  className="h-11 rounded-2xl px-6 text-sm font-semibold text-white"
-                  style={{
-                    ...(accentGradientValue ? { backgroundImage: accentGradientValue } : { backgroundColor: accent }),
-                    boxShadow: `0 20px 40px ${accentSoft}`,
-                  }}
-                >
-                  Continuar con mis datos
-                </Button>
-              </div>
+            {/* Sticky Mobile CTA */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-100 bg-white p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
+                <div className="mx-auto max-w-5xl flex items-center justify-between gap-4 md:justify-end">
+                    <div className="md:hidden">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Total</p>
+                        <p className="font-bold text-slate-900">{formatPrice(selectedService)}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setStage(2);
+                        setError(null);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={!canAdvanceStageOne}
+                      className={cn(
+                          "h-12 rounded-full px-8 text-base font-bold text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none",
+                          !canAdvanceStageOne ? "bg-slate-300" : ""
+                      )}
+                      style={canAdvanceStageOne ? {
+                        ...(accentGradientValue ? { backgroundImage: accentGradientValue } : { backgroundColor: accent }),
+                        boxShadow: `0 10px 30px ${accentSoft}`,
+                      } : {}}
+                    >
+                      Siguiente paso
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="ml-2 w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </Button>
+                </div>
             </div>
           </div>
 
-          <aside className="space-y-6 lg:sticky lg:top-8">
-            <SummaryCard />
-            <HelperCard />
+          <aside className="hidden lg:block space-y-6">
+             <div className="sticky top-8 space-y-6">
+                <SummaryCard />
+                <HelperCard />
+             </div>
           </aside>
         </div>
       )}
 
       {stage === 2 && (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr),320px]">
-          <section className="rounded-[32px] border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/60">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-slate-400">Etapa 2 · Tus datos</p>
-            <h3 className="mt-2 text-2xl font-semibold text-slate-900">Ingresá tu contacto para confirmar</h3>
-            <p className="text-sm text-slate-500">Usamos esta información para enviarte la confirmación y coordinar cualquier ajuste por WhatsApp.</p>
-            <div className="mt-6 space-y-4">
-              <Input
-                placeholder="Nombre y apellido"
-                value={patientName}
-                onChange={(event) => setPatientName(event.target.value)}
-                className="h-12 rounded-2xl border-slate-200 bg-white text-sm focus:border-slate-900"
-              />
-              <Input
-                placeholder="Celular / WhatsApp"
-                value={patientPhone}
-                onChange={(event) => setPatientPhone(event.target.value)}
-                className="h-12 rounded-2xl border-slate-200 bg-white text-sm focus:border-slate-900"
-              />
-              <Textarea
-                placeholder="Notas o indicaciones (opcional)"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                className="min-h-[96px] rounded-2xl border-slate-200 text-sm focus:border-slate-900"
-              />
-            </div>
-            <div className="mt-6 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Recordatorios por WhatsApp</p>
-                <p className="text-xs text-slate-500">Te avisamos 24 hs antes. Podés desactivarlo cuando quieras.</p>
-              </div>
-              <Switch checked={receiveNotifications} onCheckedChange={setReceiveNotifications} aria-label="Activar recordatorios" />
-            </div>
-            {error ? (
-              <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-600">{error}</p>
-            ) : null}
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setStage(1);
-                  setError(null);
-                }}
-                className="rounded-2xl border border-slate-200 px-5 py-2 text-sm text-slate-600 transition hover:border-slate-900"
-              >
-                Volver a la agenda
-              </button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!canSubmitStageTwo || submitting}
-                className="h-11 rounded-2xl px-6 text-sm font-semibold text-white shadow-lg"
-                style={{
-                  ...(accentGradientValue ? { backgroundImage: accentGradientValue } : { backgroundColor: accent }),
-                  boxShadow: `0 20px 40px ${accentSoft}`,
-                }}
-              >
-                {submitting ? "Reservando..." : "Confirmar y enviar WhatsApp"}
-              </Button>
-            </div>
+        <div className="grid gap-8 lg:grid-cols-[1fr,380px]">
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+             <div className="rounded-[2.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10">
+                <div className="mb-8">
+                  <h3 className="text-2xl font-bold tracking-tight text-slate-900">Tus datos</h3>
+                  <p className="mt-1 text-slate-500">¿A dónde te enviamos la confirmación?</p>
+                </div>
+
+                <div className="grid gap-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                          <label className="text-sm font-semibold text-slate-700 ml-1">Nombre completo</label>
+                          <Input
+                            placeholder="Ej: Juan Pérez"
+                            value={patientName}
+                            onChange={(event) => setPatientName(event.target.value)}
+                            className="h-12 rounded-xl border-slate-200 bg-slate-50 px-4 text-base focus:border-slate-900 focus:ring-slate-900"
+                          />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-sm font-semibold text-slate-700 ml-1">WhatsApp</label>
+                          <Input
+                            placeholder="Ej: 11 1234 5678"
+                            value={patientPhone}
+                            onChange={(event) => setPatientPhone(event.target.value)}
+                            className="h-12 rounded-xl border-slate-200 bg-slate-50 px-4 text-base focus:border-slate-900 focus:ring-slate-900"
+                          />
+                      </div>
+                  </div>
+
+                  <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700 ml-1">Notas adicionales (opcional)</label>
+                      <Textarea
+                        placeholder="Si necesitás aclarar algo sobre tu turno, escribilo acá..."
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        className="min-h-[120px] rounded-xl border-slate-200 bg-slate-50 p-4 text-base focus:border-slate-900 focus:ring-slate-900 resize-none"
+                      />
+                  </div>
+
+                  <div className="rounded-2xl bg-indigo-50 p-6">
+                    <div className="flex items-start gap-4">
+                        <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                <path fillRule="evenodd" d="M4.804 21.644A6.707 6.707 0 006 21.75a6.721 6.721 0 003.583-1.029c.774.182 1.584.279 2.417.279 5.322 0 9.75-3.97 9.75-9 0-5.03-4.428-9-9.75-9s-9.75 3.97-9.75 9c0 2.409 1.025 4.587 2.674 6.192.232.226.277.428.254.543a3.73 3.73 0 01-.814 1.686.75.75 0 00.44 1.223zM8.25 10.875a1.125 1.125 0 100 2.25 1.125 1.125 0 000-2.25zM10.875 12a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0zm4.875-1.125a1.125 1.125 0 100 2.25 1.125 1.125 0 000-2.25z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-sm font-bold text-indigo-900">Recordatorios automáticos</h4>
+                            <p className="mt-1 text-sm text-indigo-700">Te vamos a avisar 24 hs antes de tu turno para que no te olvides.</p>
+                        </div>
+                        <Switch checked={receiveNotifications} onCheckedChange={setReceiveNotifications} />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-600 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                           <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+                        </svg>
+                        {error}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-slate-100 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStage(1);
+                          setError(null);
+                        }}
+                        className="text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+                      >
+                        ← Volver atrás
+                      </button>
+                      
+                      <Button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!canSubmitStageTwo || submitting}
+                        className={cn(
+                           "h-12 rounded-full px-8 text-base font-bold text-white shadow-xl transition-all hover:scale-105 hover:-translate-y-1 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0",
+                           submitting && "opacity-80 cursor-wait"
+                        )}
+                        style={{
+                          ...(accentGradientValue ? { backgroundImage: accentGradientValue } : { backgroundColor: accent }),
+                          boxShadow: `0 10px 30px ${accentSoft}`,
+                        }}
+                      >
+                        {submitting ? (
+                            <span className="flex items-center gap-2">
+                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                                Procesando...
+                            </span>
+                        ) : "Confirmar Reserva"}
+                      </Button>
+                  </div>
+                </div>
+             </div>
           </section>
 
-          <aside className="space-y-6 lg:sticky lg:top-8">
-            <SummaryCard />
-            <HelperCard />
+          <aside className="hidden lg:block space-y-6">
+             <div className="sticky top-8 space-y-6">
+                <SummaryCard />
+                <HelperCard />
+             </div>
           </aside>
         </div>
       )}
 
       {stage === 3 && (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr),320px]">
-          <section className="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-xl shadow-emerald-100/80">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-emerald-500">Etapa 3 · Confirmación</p>
-            <h3 className="mt-2 text-2xl font-semibold text-slate-900">Turno confirmado y enviado</h3>
-            <p className="text-sm text-slate-500">Te compartimos automáticamente un mensaje con todos los datos de tu reserva.</p>
-            <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              {success ?? "Generamos tu mensaje de confirmación y lo estamos enviando a tu WhatsApp."}
-            </div>
-            {lastBookingSummary ? (
-              <div className="mt-6 grid gap-4 rounded-3xl border border-slate-100 bg-slate-50 p-5 text-sm text-slate-600 md:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Paciente</p>
-                  <p className="text-base font-semibold text-slate-900">{lastBookingSummary.firstName}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Tratamiento</p>
-                  <p className="text-base font-semibold text-slate-900">{lastBookingSummary.service}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Fecha</p>
-                  <p className="text-base font-semibold text-slate-900">{lastBookingSummary.date}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Horario</p>
-                  <p className="text-base font-semibold text-slate-900">{lastBookingSummary.time} hs</p>
-                </div>
-              </div>
-            ) : null}
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button
-                type="button"
-                onClick={handleRestart}
-                className="h-11 rounded-2xl px-6 text-sm font-semibold text-white"
-                style={{
-                  ...(accentGradientValue ? { backgroundImage: accentGradientValue } : { backgroundColor: accent }),
-                  boxShadow: `0 20px 40px ${accentSoft}`,
-                }}
-              >
-                Reservar otro turno
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStage(2);
-                  setSuccess(null);
-                  setLastBookingSummary(null);
-                }}
-                className="rounded-2xl border border-slate-200 px-5 py-2 text-sm text-slate-600 transition hover:border-slate-900"
-              >
-                Modificar datos
-              </button>
-            </div>
+        <div className="grid gap-8 lg:grid-cols-[1fr,380px]">
+          <section className="animate-in zoom-in-95 duration-700">
+             <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-center sm:p-16 text-white shadow-2xl">
+                 {/* Background decoration */}
+                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-slate-900 to-slate-900" />
+                 
+                 <div className="relative z-10 flex flex-col items-center">
+                     <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.5)] animate-bounce">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-12 h-12 text-white">
+                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                     </div>
+                     
+                     <h2 className="mb-4 text-3xl font-bold sm:text-5xl">¡Reserva Confirmada!</h2>
+                     <p className="max-w-md text-lg text-slate-300 mb-8">
+                        Todo listo, {lastBookingSummary?.firstName}. Ya te enviamos los detalles por WhatsApp.
+                     </p>
+                     
+                     {lastBookingSummary && (
+                         <div className="w-full max-w-md rounded-3xl bg-white/10 p-6 backdrop-blur-md border border-white/10 mb-10">
+                             <div className="grid grid-cols-2 gap-y-6 text-left">
+                                 <div>
+                                     <p className="text-xs uppercase tracking-wider text-slate-400">Fecha</p>
+                                     <p className="text-xl font-bold">{lastBookingSummary.date}</p>
+                                 </div>
+                                 <div>
+                                     <p className="text-xs uppercase tracking-wider text-slate-400">Horario</p>
+                                     <p className="text-xl font-bold">{lastBookingSummary.time} hs</p>
+                                 </div>
+                                 <div className="col-span-2">
+                                     <p className="text-xs uppercase tracking-wider text-slate-400">Tratamiento</p>
+                                     <p className="text-lg font-semibold">{lastBookingSummary.service}</p>
+                                 </div>
+                             </div>
+                         </div>
+                     )}
+                     
+                     <div className="flex flex-wrap justify-center gap-4">
+                         <Button
+                            type="button"
+                            onClick={handleRestart}
+                            className="h-12 rounded-full bg-white px-8 text-base font-bold text-slate-900 transition hover:bg-slate-100"
+                         >
+                            Reservar otro turno
+                         </Button>
+                         <a
+                            href={whatsappLink ?? "#"}
+                             target="_blank"
+                             rel="noreferrer"
+                             className="inline-flex h-12 items-center justify-center rounded-full border border-slate-700 bg-transparent px-8 text-base font-bold text-white transition hover:bg-slate-800"
+                         >
+                             Ir al chat
+                         </a>
+                     </div>
+                 </div>
+             </div>
           </section>
 
-          <aside className="space-y-6 lg:sticky lg:top-8">
-            <SummaryCard />
-            <HelperCard />
+          <aside className="hidden lg:block">
+             <div className="sticky top-8">
+                <div className="rounded-3xl bg-slate-100 p-8 text-center border border-dashed border-slate-300">
+                    <p className="text-4xl mb-4">🙌</p>
+                    <h4 className="text-xl font-bold text-slate-900 mb-2">¡Gracias por elegirnos!</h4>
+                    <p className="text-slate-500">
+                        Si necesitás hacer cambios, podés responder directamente al mensaje que te enviamos.
+                    </p>
+                </div>
+             </div>
           </aside>
         </div>
       )}

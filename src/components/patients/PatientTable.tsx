@@ -208,7 +208,7 @@ export function PatientTable({ data }: { data: Patient[] }) {
                   <TableCell>
                     <div className="flex gap-2">
                       {patient.optOut && (
-                        <Badge label="Opt-Out" color="canceled" />
+                        <Badge variant="canceled">Opt-Out</Badge>
                       )}
                       {patient.noShowCount > 0 && (
                         <div className="flex items-center gap-1 text-xs text-orange-600 font-medium">

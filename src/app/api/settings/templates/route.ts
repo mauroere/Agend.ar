@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TEMPLATE_NAMES, templatePreview } from "@/lib/messages";
-import { getRouteSupabase } from "@/lib/supabase/route";
+import { getRouteTenantContext } from "@/server/tenant-context";
 import { Database } from "@/types/database";
-import { getTenantHeaderInfo } from "@/server/tenant-headers";
 
 type TemplateRow = Database["public"]["Tables"]["agenda_message_templates"]["Row"];
 
@@ -16,18 +15,9 @@ type IncomingTemplate = {
 };
 
 export async function POST(request: NextRequest) {
-  const supabase = getRouteSupabase() as any;
-  const { data: auth } = await supabase.auth.getSession();
-  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? null;
-  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
-  const tenantId = tokenTenant ?? headerInfo.internalId;
-  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  
-  if (headerInfo.internalId && tokenTenant && headerInfo.internalId !== tokenTenant && !headerInfo.isDevBypass) {
-    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
-  }
+  const context = await getRouteTenantContext(request);
+  if ("error" in context) return context.error;
+  const { db, tenantId } = context;
 
   const body = await request.json();
   const templates = (body?.templates ?? []) as IncomingTemplate[];
@@ -39,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (!tpl.content || typeof tpl.content !== "string") {
       return NextResponse.json({ error: "Invalid template content" }, { status: 400 });
     }
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from("agenda_message_templates")
       .select("id")
       .eq("tenant_id", tenantId)
@@ -55,7 +45,7 @@ export async function POST(request: NextRequest) {
         meta_template_name: tpl.meta_template_name ?? null,
       } satisfies Partial<TemplateRow>;
 
-      const { error } = await supabase
+      const { error } = await db
         .from("agenda_message_templates")
         .update(updatePayload)
         .eq("id", existingId)
@@ -68,10 +58,10 @@ export async function POST(request: NextRequest) {
         language: "es",
         content: tpl.content,
         status: tpl.status ?? "active",
-        meta_template_name: tpl.meta_template_name ?? null,
+        meta_template_name: tpl.meta_template_name,
       } satisfies Database["public"]["Tables"]["agenda_message_templates"]["Insert"];
 
-      const { error } = await supabase.from("agenda_message_templates").insert(insertPayload);
+      const { error } = await db.from("agenda_message_templates").insert(insertPayload);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     }
   }
@@ -80,20 +70,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = getRouteSupabase() as any;
-  const { data: auth } = await supabase.auth.getSession();
-  const tokenTenant = (auth.session?.user?.app_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? (auth.session?.user?.user_metadata as Record<string, string> | undefined)?.tenant_id
-    ?? null;
-  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
-  const tenantId = tokenTenant ?? headerInfo.internalId;
-  if (!auth.session || !tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  
-  if (headerInfo.internalId && tokenTenant && headerInfo.internalId !== tokenTenant && !headerInfo.isDevBypass) {
-    return NextResponse.json({ error: "Tenant mismatch" }, { status: 403 });
-  }
+  const context = await getRouteTenantContext(request);
+  if ("error" in context) return context.error;
+  const { db, tenantId } = context;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("agenda_message_templates")
     .select("name, content, status, meta_template_name")
     .eq("tenant_id", tenantId);

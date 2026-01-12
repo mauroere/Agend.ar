@@ -283,18 +283,6 @@ type IntegrationsUpdate = Partial<IntegrationsRow>;
 export interface Database {
   public: {
     Tables: {
-      appointments: {
-        Row: AppointmentsRow;
-        Insert: AppointmentsInsert;
-        Update: AppointmentsUpdate;
-        Relationships: [];
-      };
-      patients: {
-        Row: PatientsRow;
-        Insert: PatientsInsert;
-        Update: PatientsUpdate;
-        Relationships: [];
-      };
       agenda_locations: {
         Row: LocationsRow;
         Insert: LocationsInsert;

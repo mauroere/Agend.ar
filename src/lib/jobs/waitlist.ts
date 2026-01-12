@@ -9,9 +9,10 @@ export async function runWaitlistJob() {
   if (!serviceClient) throw new Error("Supabase service client unavailable");
 
   const cutoff = addHours(new Date(), 48).toISOString();
+  // Fetch canceled appointments, including location details for timezone
   const { data: canceled } = await serviceClient
     .from("agenda_appointments")
-    .select("id, tenant_id, location_id, start_at")
+    .select("id, tenant_id, location_id, start_at, agenda_locations:location_id(name, timezone)")
     .eq("status", "canceled")
     .gte("updated_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
     .lte("start_at", cutoff);
@@ -23,6 +24,9 @@ export async function runWaitlistJob() {
   const templateKey = TEMPLATE_NAMES.waitlistOffer;
 
   for (const appt of canceled ?? []) {
+    const timeZone = (appt as any).agenda_locations?.timezone ?? "America/Argentina/Buenos_Aires";
+    const _locationName = (appt as any).agenda_locations?.name ?? "";
+
     const [credentials, templates] = await Promise.all([
       (async () => {
         if (!credentialCache.has(appt.tenant_id)) {
@@ -62,7 +66,7 @@ export async function runWaitlistJob() {
       const patient = (w as any).agenda_patients;
       if (!patient || patient.opt_out) continue;
 
-      // Idempotency check: Don't send the same offer twice to the same patient for the same appointment
+      // Idempotency check
       const { data: existingLog } = await serviceClient
         .from("agenda_message_log")
         .select("id")
@@ -74,14 +78,16 @@ export async function runWaitlistJob() {
       if (existingLog) {
         continue;
       }
+      
+      const apptDate = new Date(appt.start_at);
 
       try {
         await sendTemplateMessage({
           to: patient.phone_e164,
           template: templateKey,
           variables: [
-            new Date(appt.start_at).toLocaleDateString("es-AR"),
-            new Date(appt.start_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
+            apptDate.toLocaleDateString("es-AR", { day: 'numeric', month: 'long', timeZone }),
+            apptDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone }),
           ],
           nameOverride: templateOverride,
           credentials,

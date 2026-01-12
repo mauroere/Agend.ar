@@ -10,6 +10,7 @@ import { findTenantByPublicIdentifier } from "@/server/tenant-routing";
 export const dynamic = "force-dynamic";
 
 type TenantMetadata = {
+  companyDisplayName?: string | null;
   heroTitle?: string | null;
   heroSubtitle?: string | null;
   heroTagline?: string | null;
@@ -124,6 +125,7 @@ export default async function BookingPage({ params }: { params: { tenantId?: str
     throw new Error("Esta cuenta todavía no tiene ubicaciones configuradas");
   }
 
+  const companyDisplayName = branding.companyDisplayName ?? null;
   const heroTitle = branding.heroTitle ?? tenantRecord.name;
   const heroSubtitle =
     branding.heroSubtitle ??
@@ -144,128 +146,170 @@ export default async function BookingPage({ params }: { params: { tenantId?: str
   const accentSurfaceStyle = accentGradient ? { backgroundImage: accentGradient } : { backgroundColor: accentColor };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white text-slate-900">
-      <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-16">
-        <section className="rounded-[48px] border border-slate-100 bg-white/95 p-10 shadow-[0_40px_120px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-12 lg:grid-cols-[1.15fr,0.85fr]">
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                {logoUrl ? (
-                  <Image src={logoUrl} alt={tenantRecord.name} width={160} height={48} className="h-10 w-auto" />
-                ) : (
-                  <span className="text-xs uppercase tracking-[0.4em] text-slate-500">{heroTagline}</span>
-                )}
-                <span className="rounded-full border border-slate-200 px-3 py-1 text-xs uppercase tracking-[0.3em] text-slate-500">
-                  {heroTagline}
-                </span>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Reservá sin fricción</p>
-                <h1 className="mt-3 text-4xl font-semibold leading-tight text-slate-900 md:text-5xl" style={{ color: accentColor }}>
-                  {heroTitle}
-                </h1>
-              </div>
-              <p className="max-w-2xl text-base text-slate-600 md:text-lg">{heroSubtitle}</p>
-              <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                {[
-                  "Elegí el tratamiento",
-                  "Seleccioná profesional",
-                  "Confirmá fecha y datos",
-                ].map((chip) => (
-                  <span key={chip} className="rounded-full border border-slate-200 px-4 py-2">
-                    {chip}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-4">
-                <a
-                  href="#catalog"
-                  className="inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold text-white"
-                  style={accentSurfaceStyle}
-                >
-                  {buttonText}
-                </a>
-                <a
-                  href="#catalog"
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-6 py-3 text-sm text-slate-700 transition hover:border-slate-900"
-                >
-                  Ver pasos
-                </a>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { title: "Tratamiento", detail: "Catálogo con fotos reales" },
-                  { title: "Profesional", detail: "Elegí quién te atiende" },
-                  { title: "Confirmación", detail: "WhatsApp + recordatorios" },
-                ].map((step, index) => (
-                  <div key={step.title} className="rounded-3xl border border-slate-100 bg-slate-50 p-4 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-slate-400">
-                      {String(index + 1).padStart(2, "0")}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{step.title}</p>
-                    <p className="text-xs text-slate-500">{step.detail}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-5">
-              <div className="relative overflow-hidden rounded-[36px] border border-slate-100 bg-slate-100/60 p-4">
-                <div
-                  className="h-72 rounded-[28px]"
-                  style={{
-                    backgroundImage: `linear-gradient(110deg, rgba(15,23,42,0.15), rgba(15,23,42,0.35)), url(${heroImageUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <div className="mt-5 grid gap-3 text-sm text-slate-600">
-                  <div className="rounded-2xl border border-slate-100 bg-white/90 p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Agenda visible</p>
-                    <p className="text-sm text-slate-600">Disponibilidad minuto a minuto y confirmación automática.</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-100 bg-white/90 p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Recordatorios</p>
-                    <p className="text-sm text-slate-600">Te avisamos 24 hs antes y podés reprogramar desde el mensaje.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <BookingFlow
-          tenantId={tenantId}
-          tenantName={tenantRecord.name}
-          services={services}
-          providers={providers}
-          locations={locations}
-          ctaLabel={buttonText}
-          accentColor={accentColor}
-          accentGradient={accentGradient ?? undefined}
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-900 selection:text-white">
+      {/* Immersive Hero Section */}
+      <div className="relative h-[85vh] w-full overflow-hidden bg-slate-900">
+        {/* Background Image with animated zoom effect */}
+        <div 
+           className="absolute inset-0 opacity-60 animate-[pulse_10s_ease-in-out_infinite] scale-105"
+           style={{
+             backgroundImage: `url(${heroImageUrl})`,
+             backgroundSize: "cover",
+             backgroundPosition: "center",
+           }}
         />
+        {/* Gradient Overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
+        
+        <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
+            {logoUrl ? (
+              <div className="mb-8 p-8 bg-white/10 backdrop-blur-md rounded-[2.5rem] border border-white/20 shadow-2xl">
+                 <Image src={logoUrl} alt={companyDisplayName ?? tenantRecord.name} width={400} height={160} className="h-32 w-auto object-contain drop-shadow-md" />
+              </div>
+            ) : null}
+
+            {companyDisplayName && (
+                <h2 className="mb-6 text-2xl font-bold tracking-widest uppercase text-white/90 drop-shadow-sm">
+                    {companyDisplayName}
+                </h2>
+            )}
+            
+            {!logoUrl && !companyDisplayName && (
+               <h2 className="mb-4 text-sm font-bold tracking-[0.3em] uppercase text-white/80">{heroTagline}</h2>
+            )}
+            
+            <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight text-white sm:text-7xl drop-shadow-lg mb-6 leading-tight">
+              {heroTitle}
+            </h1>
+            
+            <p className="max-w-lg text-lg text-slate-200 sm:text-2xl font-light mb-10 leading-relaxed drop-shadow-md">
+              {heroSubtitle}
+            </p>
+
+            <a
+              href="#catalog"
+              className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-white px-10 py-5 text-lg font-bold text-slate-900 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+            >
+              <span className="mr-3">{buttonText}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 transition-transform group-hover:translate-x-1">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </a>
+            
+            <div className="absolute bottom-12 flex space-x-2">
+                <div className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-2 h-2 rounded-full bg-white animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-2 h-2 rounded-full bg-white animate-bounce"></div>
+            </div>
+        </div>
       </div>
+
+      <div id="catalog" className="relative z-20 -mt-10 rounded-t-[40px] bg-slate-50 px-4 pt-16 pb-24 shadow-[0_-20px_60px_rgba(0,0,0,0.15)] sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+            <BookingFlow
+              tenantId={tenantId}
+              tenantName={tenantRecord.name}
+              services={services}
+              providers={providers}
+              locations={locations}
+              ctaLabel={buttonText}
+              accentColor={accentColor}
+              accentGradient={accentGradient ?? undefined}
+              whatsappLink={whatsappLink}
+            />
+        
+            <div className="mt-24 border-t border-slate-200 pt-16">
+              <div className="grid gap-12 lg:grid-cols-3">
+                 <div className="lg:col-span-1 space-y-6 text-center lg:text-left">
+                    <div>
+                        <h4 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-2">Empresa</h4>
+                        <p className="text-2xl font-bold text-slate-900">{companyDisplayName ?? tenantRecord.name}</p>
+                    </div>
+                    
+                    {(branding.schedule) && (
+                        <div>
+                            <h4 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-2">Horarios</h4>
+                            <p className="text-lg text-slate-600 whitespace-pre-wrap">{branding.schedule}</p>
+                        </div>
+                    )}
+
+                    {(branding.contactEmail || branding.contactPhone) && (
+                        <div>
+                            <h4 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-2">Contacto</h4>
+                            <div className="space-y-1 text-lg text-slate-600">
+                                {branding.contactPhone && <p>{branding.contactPhone}</p>}
+                                {branding.contactEmail && <p>{branding.contactEmail}</p>}
+                            </div>
+                        </div>
+                    )}
+                 </div>
+
+                 <div className="lg:col-span-2 grid gap-8 sm:grid-cols-2">
+                    {locations.map((loc) => (
+                        <div key={loc.id} className="group relative overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-100 transition-all hover:shadow-xl">
+                            <div className="absolute inset-0 h-32 bg-slate-100">
+                                <iframe 
+                                    width="100%" 
+                                    height="100%" 
+                                    style={{ border: 0, opacity: 0.8 }}
+                                    loading="lazy" 
+                                    allowFullScreen 
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                    src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? ''}&q=${encodeURIComponent((loc.address ?? '') + ', Argentina')}`}
+                                ></iframe>
+                                {/* Fallback visual if no API key or empty address - using a static map pattern or just a placeholder */}
+                                {!process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY && (
+                                   <div className="absolute inset-0 flex items-center justify-center bg-slate-200 text-slate-400">
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 opacity-50">
+                                         <path fillRule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                      </svg>
+                                   </div>
+                                )}
+                            </div>
+                            <div className="relative mt-32 p-6 pt-4 bg-white">
+                                <h4 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{loc.name}</h4>
+                                <p className="mt-1 text-sm text-slate-500 line-clamp-2">
+                                   {loc.address || "Dirección no especificada"}
+                                </p>
+                                {loc.address && (
+                                    <a 
+                                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address)}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="mt-4 inline-flex items-center text-sm font-semibold text-slate-900 hover:text-indigo-600 hover:underline"
+                                    >
+                                        Cómo llegar
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 ml-1">
+                                            <path fillRule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z" clipRule="evenodd" />
+                                        </svg>
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                 </div>
+              </div>
+            </div>
+        </div>
+      </div>
+      
       {whatsappLink ? (
         <a
           href={whatsappLink}
           target="_blank"
           rel="noreferrer"
           aria-label="Chatear por WhatsApp"
-          className="fixed bottom-6 right-6 flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-900 shadow-[0_20px_45px_rgba(16,185,129,0.4)] transition hover:-translate-y-0.5"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full bg-[#25D366] px-6 py-4 text-base font-bold text-white shadow-[0_10px_40px_rgba(37,211,102,0.4)] transition-all duration-300 hover:scale-110 hover:-translate-y-1"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
+            fill="currentColor"
+            className="h-6 w-6"
           >
-            <path d="M21 12.1c0 4.5-3.7 8.1-8.3 8.1-1.5 0-2.9-.4-4.1-1.2L3 21l1.1-5.1c-.8-1.2-1.2-2.7-1.2-4.2C3 7.2 6.7 3.6 11.3 3.6s9.7 3.6 9.7 8.5z" />
-            <path d="M15.3 14.1c-.2.4-.9.7-1.3.8-.3.1-.6.1-.9.1-.9 0-2.1-.6-3-1.5-.8-.8-1.5-2-1.5-3 0-.3 0-.6.1-.9.1-.4.4-1.1.8-1.3.1-.1.2-.2.4-.2.1 0 .2 0 .3.2.2.4.6 1.5.6 1.6 0 .1 0 .2-.1.3l-.3.5c-.1.1-.1.2 0 .4.2.4.7 1.1 1.4 1.8.7.7 1.5 1.2 1.9 1.4.1.1.3.1.4 0l.5-.3c.1-.1.2-.1.3-.1.1 0 1.2.4 1.6.6.2.1.2.2.2.3-.1.2-.2.3-.3.4z" />
+            <path fillRule="evenodd" clipRule="evenodd" d="M18.403 5.633A8.919 8.919 0 0 0 12.053 3c-4.948 0-8.976 4.027-8.978 8.977 0 1.582.413 3.126 1.198 4.488L3 21.116l4.759-1.249a8.981 8.981 0 0 0 4.29 1.093h.004c4.947 0 8.975-4.026 8.977-8.977a8.926 8.926 0 0 0-2.627-6.35m-6.35 13.812h-.003a7.446 7.446 0 0 1-3.798-1.041l-.272-.162-2.824.741.753-2.753-.177-.282a7.448 7.448 0 0 1-1.141-3.971c.002-4.114 3.349-7.461 7.465-7.461a7.413 7.413 0 0 1 5.275 2.188 7.42 7.42 0 0 1 2.183 5.279c-.002 4.114-3.349 7.462-7.461 7.462m4.093-5.589c-.225-.113-1.327-.655-1.533-.73-.205-.075-.354-.112-.504.112-.15.224-.579.73-.71.88-.131.15-.262.169-.486.056-.224-.113-.945-.349-1.801-1.113-.667-.595-1.117-1.329-1.248-1.554-.131-.225-.014-.347.099-.458.101-.1.224-.261.336-.393.112-.131.149-.224.224-.374.075-.149.037-.28-.019-.393-.056-.113-.504-1.214-.69-1.663-.181-.435-.366-.376-.504-.383-.131-.006-.28-.008-.429-.008-.15 0-.393.056-.6.28-.206.225-.785.767-.785 1.871 0 1.104.804 2.171.916 2.32.112.15 1.582 2.415 3.832 3.387.536.231.954.369 1.279.473.536.171 1.024.147 1.409.089.429-.064 1.327-.542 1.514-1.066.187-.524.187-.973.131-1.065-.056-.092-.206-.149-.43-.261" />
           </svg>
-          WhatsApp
+          <span className="hidden sm:inline">WhatsApp</span>
         </a>
       ) : null}
     </div>
