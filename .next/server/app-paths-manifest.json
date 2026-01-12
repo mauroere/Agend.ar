@@ -1,6 +1,4 @@
 {
-  "/settings/page": "app/settings/page.js",
-  "/api/public/availability/route": "app/api/public/availability/route.js",
-  "/api/public/appointments/route": "app/api/public/appointments/route.js",
-  "/book/[tenantId]/page": "app/book/[tenantId]/page.js"
+  "/book/[tenantId]/page": "app/book/[tenantId]/page.js",
+  "/settings/page": "app/settings/page.js"
 }
