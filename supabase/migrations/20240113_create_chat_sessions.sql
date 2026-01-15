@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.agenda_chat_sessions (
 );
 
 -- Indice para búsqueda rápida por usuario y tenant
-CREATE INDEX IF NOT EXISTS idx_chat_sessions_lookup ON public.agenda_chat_sessions(tenant_id, phone_number);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_lookup ON public.agenda_chat_sessions (tenant_id, phone_number);
 
 -- Trigger para actualizar updated_at
 CREATE OR REPLACE FUNCTION update_chat_session_timestamp()

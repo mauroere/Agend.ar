@@ -3,7 +3,5 @@
 
 DROP POLICY IF EXISTS agenda_users_read_own ON public.agenda_users;
 
-CREATE POLICY agenda_users_read_own ON public.agenda_users
-FOR SELECT
-TO authenticated
-USING (id = auth.uid());
+CREATE POLICY agenda_users_read_own ON public.agenda_users FOR
+SELECT TO authenticated USING (id = auth.uid ());
