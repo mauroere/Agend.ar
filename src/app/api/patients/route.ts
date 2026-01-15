@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
 
   let dbQuery = db
     .from("agenda_patients")
-    .select("id, full_name, phone_e164")
+    .select("id, full_name, phone_e164, email")
     .eq("tenant_id", tenantId)
     .order("full_name", { ascending: true })
     .limit(limit);
 
   if (query) {
-    dbQuery = dbQuery.or(`full_name.ilike.%${query}%,phone_e164.ilike.%${query}%`);
+    dbQuery = dbQuery.or(`full_name.ilike.%${query}%,phone_e164.ilike.%${query}%,email.ilike.%${query}%`);
     const { data, error } = await dbQuery;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ patients: data });
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
   // Fallback if no appointments yet: return created_at desc
   const { data, error } = await db
     .from("agenda_patients")
-    .select("id, full_name, phone_e164")
+    .select("id, full_name, phone_e164, email")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { fullName, phone, notes } = body ?? {};
+    const { fullName, phone, email, notes } = body ?? {};
 
     if (!fullName || !phone) {
       return NextResponse.json({ error: "Nombre y teléfono son requeridos" }, { status: 400 });
@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
         tenant_id: tenantId,
         full_name: fullName,
         phone_e164: normalizedPhone,
+        email: email || null,
         notes: notes || null,
         opt_out: false, // Default
       })

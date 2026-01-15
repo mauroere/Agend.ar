@@ -24,6 +24,7 @@ type PatientDialogBaseProps = {
   defaultValues?: {
     fullName?: string;
     phone?: string;
+    email?: string; // New
     notes?: string | null;
     optOut?: boolean;
   };
@@ -38,6 +39,7 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
   // Field states
   const [fullName, setFullName] = useState(defaultValues?.fullName ?? "");
   const [phone, setPhone] = useState(defaultValues?.phone ?? "");
+  const [email, setEmail] = useState(defaultValues?.email ?? ""); // New
   const [phoneError, setPhoneError] = useState<string | null>(null);
   
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
@@ -46,6 +48,7 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
   useEffect(() => {
     setFullName(defaultValues?.fullName ?? "");
     setPhone(defaultValues?.phone ?? "");
+    setEmail(defaultValues?.email ?? ""); // New
     setNotes(defaultValues?.notes ?? "");
     setOptOut(defaultValues?.optOut ?? false);
   }, [defaultValues]);
@@ -80,6 +83,7 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
     const payload: Record<string, unknown> = {
       fullName,
       phone: formatted || phone,
+      email: email || null, // New
       notes,
     };
 
@@ -138,6 +142,16 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Ej: Juan Pérez"
+            />
+          </div>
+          
+          <div className="grid gap-2">
+            <label className="text-sm font-medium leading-none">Email</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="ejemplo@email.com"
             />
           </div>
 

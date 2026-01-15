@@ -166,6 +166,20 @@ export default async function BookingPage({ params }: { params: { tenantId?: str
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-900 selection:text-white">
+      {/* Top Navigation Bar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-end px-6 py-4 pointer-events-none">
+          <a 
+            href={`/${slugOrIdFromParams}/portal`} 
+            className="pointer-events-auto flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-medium transition-all shadow-lg border border-white/10 hover:scale-105"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+            </span>
+             Soy Paciente
+          </a>
+      </nav>
+
       {/* Immersive Hero Section */}
       <div className="relative min-h-[85vh] w-full overflow-hidden bg-slate-900">
         {/* Background Image with animated zoom effect */}

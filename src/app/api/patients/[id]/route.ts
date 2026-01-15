@@ -11,14 +11,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
 
-  const { fullName, phone, optOut, notes } = body as {
+  const { fullName, phone, email, optOut, notes } = body as {
     fullName?: string;
     phone?: string;
+    email?: string;
     optOut?: boolean;
     notes?: string | null;
   };
 
-  if (!fullName && !phone && typeof optOut === "undefined" && typeof notes === "undefined") {
+  if (!fullName && !phone && !email && typeof optOut === "undefined" && typeof notes === "undefined") {
     return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
   }
 
@@ -26,6 +27,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (fullName) {
     updates.full_name = fullName;
+  }
+
+  if (typeof email === "string") {
+    // Basic validation
+    updates.email = email.trim() || null;
   }
 
   if (typeof optOut === "boolean") {

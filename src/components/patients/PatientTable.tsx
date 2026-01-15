@@ -15,6 +15,7 @@ export type Patient = {
   id: string;
   fullName: string;
   phone: string;
+  email: string | null;
   nextAppointment: string | null;
   noShowCount: number;
   optOut: boolean;
@@ -53,6 +54,7 @@ export function PatientTable({ data }: { data: Patient[] }) {
       id: record.id,
       fullName: record.full_name,
       phone: record.phone_e164,
+      email: record.email || null,
       optOut: resolvedOptOut,
       notes: resolvedNotes,
       nextAppointment: fallback?.nextAppointment ?? null,
@@ -68,12 +70,13 @@ export function PatientTable({ data }: { data: Patient[] }) {
       const searchPhone = q.replace(/\D/g, "");
       
       const matchName = patient.fullName.toLowerCase().includes(q);
+      const matchEmail = patient.email?.toLowerCase().includes(q) ?? false;
       // Si el usuario escribe números, intentar coincidir con el teléfono limpio
       const matchPhone = searchPhone.length > 2 
         ? rawPhone.includes(searchPhone) 
         : patient.phone.includes(q);
 
-      return matchName || matchPhone;
+      return matchName || matchPhone || matchEmail;
     });
   }, [rows, query]);
 
@@ -156,6 +159,7 @@ export function PatientTable({ data }: { data: Patient[] }) {
             defaultValues={{
               fullName: editingPatient.fullName,
               phone: editingPatient.phone,
+              email: editingPatient.email || undefined,
               notes: editingPatient.notes,
               optOut: editingPatient.optOut,
             }}
@@ -190,9 +194,16 @@ export function PatientTable({ data }: { data: Patient[] }) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Phone className="h-3 w-3" />
-                      {patient.phone}
+                    <div className="flex flex-col gap-1">
+                       <div className="flex items-center gap-2 text-slate-600">
+                         <Phone className="h-3 w-3" />
+                         {patient.phone}
+                       </div>
+                       {patient.email ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <span className="truncate max-w-[150px]">{patient.email}</span>
+                        </div>
+                       ) : null}
                     </div>
                   </TableCell>
                   <TableCell>

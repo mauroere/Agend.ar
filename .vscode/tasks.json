@@ -1033,6 +1033,28 @@
 			"label": "Append Env Var",
 			"type": "shell",
 			"command": "Add-Content .env.local \"`nNEXT_PUBLIC_DEV_TENANT_SLUG=prueba2\""
+		},
+		{
+			"label": "bg-git-clean",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-Command",
+				"git rm -r --cached .next; git rm --cached .env.local; git rm --cached *.log; git rm --cached tsconfig.tsbuildinfo; git rm --cached next-env.d.ts; git commit -m 'chore: remove ignored files from index'"
+			],
+			"isBackground": false,
+			"group": "none"
+		},
+		{
+			"label": "git-commit-cleanup",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-Command",
+				"git commit -m \"cleanup_git_ignore\""
+			],
+			"isBackground": false,
+			"group": "none"
 		}
 	]
 }
