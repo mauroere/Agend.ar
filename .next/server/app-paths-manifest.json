@@ -1,4 +1,0 @@
-{
-  "/[tenantId]/page": "app/[tenantId]/page.js",
-  "/api/settings/categories/route": "app/api/settings/categories/route.js"
-}
