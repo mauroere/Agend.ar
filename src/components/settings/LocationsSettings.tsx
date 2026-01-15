@@ -24,7 +24,11 @@ export function LocationsSettings() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  // Desglosar la dirección en campos editables
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
+  
   const { toast } = useToast();
 
   const loadLocations = useCallback(async () => {
@@ -54,11 +58,51 @@ export function LocationsSettings() {
     if (loc) {
       setEditingId(loc.id);
       setName(loc.name);
-      setAddress(loc.address || "");
+      
+      // Intentar parsear la dirección existente (formato: "Calle, Ciudad, Provincia")
+      if (loc.address) {
+          const parts = loc.address.split(",").map(p => p.trim());
+          if (parts.length >= 3) {
+              setProvince(parts.pop()!);
+              setCity(parts.pop()!);
+              setStreet(parts.join(", "));
+          } else if (parts.length === 2) {
+              setProvince(parts[1]);
+              setCity(parts[0]); // Asumimos Ciudad, Provincia si son 2
+              setStreet("");     // Ojo acá, mejor estrategia:
+              // Si son 2, es ambiguo. Pongamos todo en calle para que el user arregle.
+              // Mejor: Todo en street si no matchea 3. 
+              // Revertimos logica simple:
+              // setStreet(loc.address);
+          } else {
+              setStreet(loc.address);
+              setCity("");
+              setProvince("");
+          }
+           
+          // Estrategia más segura para edición:
+          // Si tiene comas, tratamos de dividir. Si no, todo a calle.
+           const p = loc.address.split(",").map(s => s.trim());
+           if (p.length >= 3) {
+               setProvince(p[p.length - 1]);
+               setCity(p[p.length - 2]);
+               setStreet(p.slice(0, p.length - 2).join(", "));
+           } else {
+               setStreet(loc.address);
+               setCity("");
+               setProvince("");
+           }
+      } else {
+          setStreet("");
+          setCity("");
+          setProvince("");
+      }
     } else {
       setEditingId(null);
       setName("");
-      setAddress("");
+      setStreet("");
+      setCity("");
+      setProvince("");
     }
     setDialogOpen(true);
   };
@@ -67,13 +111,17 @@ export function LocationsSettings() {
     if (!name.trim()) return;
     setSaving(true);
     try {
+      // Reconstruir dirección completa
+      const fullAddressParts = [street, city, province].map(s => s.trim()).filter(Boolean);
+      const fullAddress = fullAddressParts.length > 0 ? fullAddressParts.join(", ") : "";
+
       const endpoint = editingId ? `/api/settings/locations/${editingId}` : "/api/settings/locations";
       const method = editingId ? "PATCH" : "POST";
 
       const res = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, address }),
+        body: JSON.stringify({ name, address: fullAddress }),
       });
 
       if (!res.ok) throw new Error("Error al guardar");
@@ -170,21 +218,57 @@ export function LocationsSettings() {
             <div className="space-y-2">
               <Label>Nombre del lugar</Label>
               <Input
-                placeholder="Consultorio Centro, Sucursal Norte..."
+                placeholder="Ej: Sede Central"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Dirección y Contacto</Label>
-              <Input
-                placeholder="Calle 123, Piso 2 - Tel: 11-5555-5555"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-              <p className="text-xs text-slate-500">
-                Podés incluir el teléfono aquí para que el paciente lo tenga a mano.
-              </p>
+            
+            <div className="rounded-lg bg-slate-50 p-4 space-y-3 border border-slate-100">
+                <Label className="text-slate-900 font-semibold">Ubicación Geográfica</Label>
+                <p className="text-xs text-slate-500 mb-2">Importante para que el mapa funcione correctamente.</p>
+                
+                <div className="space-y-2">
+                  <Label className="text-xs">Calle y Altura</Label>
+                  <Input
+                    placeholder="Ej: Av. Libertador 1000"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                   <div className="space-y-2">
+                      <Label className="text-xs">Ciudad / Barrio</Label>
+                      <Input
+                        placeholder="Ej: Palermo"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
+                   </div>
+                   <div className="space-y-2">
+                      <Label className="text-xs">Provincia</Label>
+                      <Input
+                        placeholder="Ej: Buenos Aires"
+                        value={province}
+                        onChange={(e) => setProvince(e.target.value)}
+                      />
+                   </div>
+                </div>
+
+                {(street || city) && (
+                    <div className="pt-2">
+                        <a 
+                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([street, city, province, "Argentina"].filter(Boolean).join(", "))}`}
+                           target="_blank"
+                           rel="noreferrer"
+                           className="text-xs flex items-center gap-1 text-indigo-600 hover:underline"
+                        >
+                            <MapPin className="h-3 w-3" />
+                            Probar visualización en Google Maps
+                        </a>
+                    </div>
+                )}
             </div>
           </div>
           <DialogFooter>

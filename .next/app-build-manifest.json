@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/book/[tenantId]/page": [
+    "/[tenantId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/book/[tenantId]/page.js"
+      "static/chunks/app/[tenantId]/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -11,10 +11,10 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/settings/page": [
+    "/professionals/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/settings/page.js"
+      "static/chunks/app/professionals/page.js"
     ]
   }
 }

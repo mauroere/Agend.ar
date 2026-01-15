@@ -1007,6 +1007,32 @@
 				"src/components/settings/AutopilotSettings.tsx"
 			],
 			"group": "test"
+		},
+		{
+			"label": "Push DB Migrations (Fix TenantId)",
+			"type": "shell",
+			"command": "npm run db:push",
+			"group": "db"
+		},
+		{
+			"label": "Push via NPX",
+			"type": "shell",
+			"command": "npx supabase db push"
+		},
+		{
+			"label": "Check Tenants Script",
+			"type": "shell",
+			"command": "node scripts/check_tenants.js"
+		},
+		{
+			"label": "Check Tenants 2",
+			"type": "shell",
+			"command": "node scripts/check_tenants.js"
+		},
+		{
+			"label": "Append Env Var",
+			"type": "shell",
+			"command": "Add-Content .env.local \"`nNEXT_PUBLIC_DEV_TENANT_SLUG=prueba2\""
 		}
 	]
 }

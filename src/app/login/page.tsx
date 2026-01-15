@@ -33,11 +33,24 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
+    
     if (signInError) {
+      setLoading(false);
       setError(signInError.message);
       return;
     }
+
+    // Check if user is admin before directing
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+       // @ts-ignore
+       const { data: profile } = await supabase.from("agenda_users").select("is_platform_admin").eq("id", user.id).single();
+       if (profile?.is_platform_admin) {
+           router.push("/admin");
+           return;
+       }
+    }
+
     router.refresh();
     router.push("/today");
   }

@@ -34,8 +34,17 @@ export default async function TodayPage({
 }: { 
     searchParams: { location?: string; date?: string; view?: string } 
 }) {
-  const { supabase, tenantId } = await requireTenantSession();
+  const { supabase, tenantId, session } = await requireTenantSession();
   const db = (serviceClient ?? supabase) as AnySupabaseClient;
+
+  // 0. Check if current user is a specific Provider
+  const { data: linkedProvider } = await db
+    .from("agenda_providers")
+    .select("id, full_name")
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+
+  const providerIdFilter = linkedProvider?.id ?? null;
 
   const viewMode = searchParams.view === "history" ? "history" : "day";
   const dateParam = searchParams.date; 
@@ -68,6 +77,11 @@ export default async function TodayPage({
         agenda_locations:location_id(name)
     `)
     .eq("tenant_id", tenantId);
+
+  // Filter by provider if the logged in user is one
+  if (providerIdFilter) {
+      query = query.eq("provider_id", providerIdFilter);
+  }
 
   let currentDate: Date;
 

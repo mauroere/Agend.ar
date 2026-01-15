@@ -30,6 +30,16 @@ type MessageLog = {
   } | null;
 };
 
+const statusMap: Record<string, string> = {
+  sent: "Enviado",
+  delivered: "Entregado",
+  read: "Leído",
+  failed: "Falló",
+  received: "Recibido"
+};
+
+const getStatusLabel = (status: string) => statusMap[status] || status;
+
 export function MessageLogsSettings() {
   const [logs, setLogs] = useState<MessageLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -85,6 +95,35 @@ export function MessageLogsSettings() {
     fetchLogs();
   }
 
+
+  const renderContent = (log: MessageLog) => {
+    if (!log.payload_json) return <span className="text-muted-foreground italic">Sin contenido</span>;
+    
+    // Inbound text messages
+    if (log.direction === 'in' && log.payload_json.text?.body) {
+        return <span>{log.payload_json.text.body}</span>;
+    }
+
+    // Outbound Template messages
+    if (log.payload_json.template) {
+        return (
+            <div className="flex flex-col gap-1">
+                <span className="font-semibold text-xs text-blue-600 dark:text-blue-400">
+                    {log.payload_json.template}
+                </span>
+                {Array.isArray(log.payload_json.variables) && (
+                    <span className="text-muted-foreground">
+                        Vars: {log.payload_json.variables.join(", ")}
+                    </span>
+                )}
+            </div>
+        );
+    }
+
+    // Fallback JSON dump for debugging
+    return <span>{JSON.stringify(log.payload_json).slice(0, 50)}</span>;
+  };
+
   return (
     <Card className="col-span-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -121,7 +160,7 @@ export function MessageLogsSettings() {
                 </TableCell>
                 <TableCell>
                   <Badge variant={log.direction === "in" ? "secondary" : "default"}>
-                    {log.direction === "in" ? "Recibido" : "Enviado"}
+                    {log.direction === "in" ? "Entrante" : "Saliente"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -130,12 +169,11 @@ export function MessageLogsSettings() {
                      log.status === 'read' ? 'outline' : 
                      'secondary'
                   }>
-                    {log.status}
+                    {getStatusLabel(log.status)}
                   </Badge>
                 </TableCell>
-                <TableCell className="max-w-[300px] truncate text-xs font-mono">
-                    {/* Extract text from payload if possible */}
-                    {JSON.stringify(log.payload_json).slice(0, 50)}...
+                <TableCell className="max-w-[300px] truncate text-xs">
+                    {renderContent(log)}
                 </TableCell>
               </TableRow>
             ))}

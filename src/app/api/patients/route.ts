@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRouteTenantContext } from "@/server/tenant-context";
+import { normalizePhoneNumber } from "@/lib/normalization";
 
 export async function GET(request: NextRequest) {
   const context = await getRouteTenantContext(request);
@@ -75,9 +76,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nombre y teléfono son requeridos" }, { status: 400 });
     }
 
-    // Normalizar el teléfono (asegurar formato e.164 básico si es simple)
-    // Asumimos que el front ya valida, pero por seguridad:
-    const normalizedPhone = phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`;
+    // Normalizar el teléfono (asegurar formato e.164, usando libphonenumber via utility)
+    const normalizedPhone = normalizePhoneNumber(phone);
 
     // Validar si ya existe
     const { data: existing } = await db

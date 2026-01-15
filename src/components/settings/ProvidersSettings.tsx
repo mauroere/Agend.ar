@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { UploadDropzone } from "@/components/uploader/UploadDropzone";
-import { Loader2, Plus, UserCheck, Edit3, Clock, CalendarOff } from "lucide-react";
+import { Loader2, Plus, UserCheck, Edit3, Clock, CalendarOff, MapPin, Calendar, UserPlus, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ProviderBlocksDialog } from "./ProviderBlocksDialog";
 import { WeeklyScheduleEditor, WeeklyScheduleState, DEFAULT_WEEKLY_SCHEDULE } from "./WeeklyScheduleEditor";
+import Image from "next/image";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -25,6 +28,10 @@ const EMPTY_FORM = {
   customEnd: "18:00",
   weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
   serviceIds: [] as string[],
+  // Acceso
+  createAccount: false,
+  email: "",
+  password: ""
 };
 
 type ProviderRecord = {
@@ -38,6 +45,8 @@ type ProviderRecord = {
   specialties: string[];
   metadata: any;
   serviceIds?: string[];
+  user_id?: string | null;
+  email?: string | null; // Added
 };
 
 type ServiceOption = { id: string; name: string };
@@ -55,7 +64,10 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [blocksProvider, setBlocksProvider] = useState<ProviderRecord | null>(null); // For blocks dialog
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
   const loadData = useCallback(async () => {
@@ -89,6 +101,8 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
   }, [loadData]);
 
   const handleOpen = (provider?: ProviderRecord) => {
+    setInviteEmail("");
+    setShowPassword(false);
     if (provider) {
       setEditingId(provider.id);
       
@@ -120,12 +134,46 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
         customEnd: "18:00",
         weeklySchedule: parsedSchedule,
         serviceIds: provider.serviceIds ?? [],
+        createAccount: false,
+        email: "",
+        password: "" 
       });
     } else {
       setEditingId(null);
       setForm({ ...EMPTY_FORM, defaultLocationId: locations[0]?.id ?? "", weeklySchedule: DEFAULT_WEEKLY_SCHEDULE });
     }
     setDialogOpen(true);
+  };
+
+  const handleInviteProvider = async () => {
+    if (!inviteEmail || !editingId) return;
+    setInviting(true);
+    try {
+        // 1. Invite User
+        const userRes = await fetch("/api/settings/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: inviteEmail, role: "staff" }),
+        });
+        const userData = await userRes.json();
+        if (!userRes.ok) throw new Error(userData.error || "Error al crear usuario");
+
+        // 2. Link to Provider
+        const linkRes = await fetch(`/api/settings/providers/${editingId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userData.userId }),
+        });
+        if (!linkRes.ok) throw new Error("Error al vincular profesional");
+
+        toast({ title: "Acceso habilitado", description: `Se enviará un email a ${inviteEmail}` });
+        setInviteEmail("");
+        await loadData();
+    } catch (e) {
+        toast({ title: "Error", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" });
+    } finally {
+        setInviting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -158,6 +206,8 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
           .filter(Boolean),
         metadata, 
         serviceIds: form.serviceIds,
+        email: form.createAccount ? form.email : undefined,
+        password: form.createAccount ? form.password : undefined
       };
 
       const endpoint = editingId ? `/api/settings/providers/${editingId}` : "/api/settings/providers";
@@ -234,49 +284,128 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
                 ) : (
                   collection.length > 0 && <p className="text-sm font-semibold text-slate-500">Pausados</p>
                 )}
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
                   {collection.map((provider) => (
                     <div
                       key={provider.id}
-                      className="rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:border-slate-300"
+                      className="relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-base font-semibold text-slate-900">{provider.full_name}</p>
-                          <p className="text-xs text-slate-500">{locationName(provider.default_location_id)}</p>
-                        </div>
-                        <span
-                          className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-                          style={{ background: provider.color ?? "#475569", color: "white" }}
-                        >
-                          {provider.active ? "Disponible" : "Pausado"}
-                        </span>
+                      {/* Header: Avatar + Info + Badge */}
+                      <div className="flex items-start gap-4">
+                          {/* Avatar */}
+                          <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-full border border-slate-100 bg-slate-50">
+                              {provider.avatar_url ? (
+                                  <Image 
+                                    src={provider.avatar_url} 
+                                    alt={provider.full_name} 
+                                    fill 
+                                    className="object-cover" 
+                                    unoptimized
+                                    sizes="56px"
+                                  />
+                              ) : (
+                                  <div  
+                                      className="flex h-full w-full items-center justify-center text-lg font-bold text-white uppercase"
+                                      style={{ backgroundColor: provider.color ?? "#94a3b8" }}
+                                  >
+                                      {provider.full_name.substring(0, 2)}
+                                  </div>
+                              )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                  <h4 className="truncate text-base font-bold text-slate-900 pr-2">{provider.full_name}</h4>
+                                  <span
+                                      className={cn(
+                                          "inline-flex flex-shrink-0 items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                          provider.active 
+                                            ? "bg-emerald-100 text-emerald-700" 
+                                            : "bg-slate-100 text-slate-600"
+                                      )}
+                                  >
+                                      {provider.active ? "Activo" : "Pausado"}
+                                  </span>
+                              </div>
+                              
+                              {/* Location & Specialties */}
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                  <span className="flex items-center gap-1 text-slate-600 font-medium bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                      <MapPin className="h-3 w-3" />
+                                      {locationName(provider.default_location_id)}
+                                  </span>
+                                  {provider.specialties.slice(0, 2).map(s => (
+                                      <span key={s} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">
+                                          {s}
+                                      </span>
+                                  ))}
+                                  {provider.specialties.length > 2 && (
+                                      <span className="text-[10px] text-slate-400">+{provider.specialties.length - 2}</span>
+                                  )}
+                              </div>
+                          </div>
                       </div>
-                      {provider.bio && <p className="mt-3 text-sm text-slate-600 line-clamp-3">{provider.bio}</p>}
-                      {provider.specialties.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                          {provider.specialties.map((tag) => (
-                            <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-                        <div className="inline-flex items-center gap-1">
-                          <UserCheck className="h-4 w-4" /> Agenda propia
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => setBlocksProvider(provider)} title="Gestionar bloqueos/vacaciones">
-                             <CalendarOff className="h-4 w-4 text-slate-400" />
-                          </Button> 
-                          <Button variant="ghost" size="sm" onClick={() => handleOpen(provider)}>
-                            <Edit3 className="mr-1 h-4 w-4" /> Editar
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => toggleActive(provider)}>
-                            {provider.active ? "Pausar" : "Activar"}
-                          </Button>
-                        </div>
+                      
+                      {/* Bio or Empty State */}
+                      <div className="mt-4 mb-4 min-h-[2.5rem]">
+                          {provider.bio ? (
+                              <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+                                  {provider.bio}
+                              </p>
+                          ) : (
+                              <p className="text-sm text-slate-400 italic">Sin biografía disponible.</p>
+                          )}
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
+                          <div className="flex gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 gap-2 text-slate-500 hover:text-indigo-600 px-2" 
+                                onClick={() => setBlocksProvider(provider)}
+                                title="Gestionar bloqueos y vacaciones"
+                              >
+                                  <CalendarOff className="h-4 w-4" />
+                                  <span className="hidden sm:inline text-xs">Bloqueos</span>
+                              </Button>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                              {provider.active && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => toggleActive(provider)}
+                                    className="h-8 w-8 p-0 sm:w-auto sm:px-3 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                    title="Pausar profesional"
+                                  >
+                                      <span className="sm:hidden">⏸</span>
+                                      <span className="hidden sm:inline text-xs font-medium">Pausar</span>
+                                  </Button>
+                              )}
+                              {!provider.active && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => toggleActive(provider)}
+                                    className="h-8 w-8 p-0 sm:w-auto sm:px-3 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                  >
+                                      <span className="sm:hidden">▶</span>
+                                      <span className="hidden sm:inline text-xs font-medium">Activar</span>
+                                  </Button>
+                              )}
+                              
+                              <Button 
+                                size="sm" 
+                                className="h-8 text-xs bg-slate-900 text-white hover:bg-slate-800 shadow-sm" 
+                                onClick={() => handleOpen(provider)}
+                              >
+                                  Editar
+                              </Button>
+                          </div>
                       </div>
                     </div>
                   ))}
@@ -321,6 +450,24 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
                 capture="environment"
                 onChange={(url) => setForm((prev) => ({ ...prev, avatarUrl: url ?? "" }))}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Consultorio Principal</Label>
+              <Select
+                value={form.defaultLocationId}
+                onChange={(e) => setForm((prev) => ({ ...prev, defaultLocationId: e.target.value }))}
+              >
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+                {!form.defaultLocationId && <option value="">Seleccionar sede...</option>}
+              </Select>
+              <p className="text-xs text-slate-500">
+                 Se usará para asignar turnos rápidos en esta sede.
+              </p>
             </div>
 
             <div className="space-y-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
@@ -381,6 +528,82 @@ export function ProvidersSettings({ locations }: ProvidersSettingsProps) {
                 onChange={(e) => setForm((prev) => ({ ...prev, specialties: e.target.value }))}
               />
             </div>
+
+            {/* SECCIÓN UNIFICADA DE ACCESO */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
+               {editingId && providers.find(p => p.id === editingId)?.user_id ? (
+                  // CASO 1: YA TIENE USUARIO VINCULADO
+                  <div className="flex flex-col gap-2">
+                     <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-emerald-500" />
+                        Acceso Habilitado
+                     </p>
+                     <p className="text-xs text-slate-500 pl-6">
+                        Este profesional ingresa con: <span className="font-mono text-slate-800">{providers.find(p => p.id === editingId)?.email || "Email desconocido"}</span>
+                     </p>
+                     <p className="text-[10px] text-slate-400 pl-6 italic">
+                        La contraseña no es visible por seguridad.
+                     </p>
+                  </div>
+               ) : (
+                  // CASO 2: NO TIENE USUARIO (O ES NUEVO) -> Formulario de Creación
+                  <>
+                    <div className="flex items-center gap-2">
+                        <Checkbox 
+                            id="createAccount" 
+                            checked={form.createAccount}
+                            onCheckedChange={(c: boolean) => setForm(prev => ({ ...prev, createAccount: c === true }))}
+                        />
+                        <Label htmlFor="createAccount" className="cursor-pointer font-medium text-slate-700">
+                            {editingId ? "Dar de alta usuario de acceso" : "Crear usuario de acceso"}
+                        </Label>
+                    </div>
+
+                    {form.createAccount && (
+                        <div className="grid gap-3 pl-6 animate-in fade-in slide-in-from-top-2">
+                            <p className="text-xs text-slate-500 mb-1">
+                               Se creará un usuario para que este profesional gestione su propia agenda.
+                            </p>
+                            <div className="space-y-1">
+                                <Label htmlFor="newEmail">Email de acceso</Label>
+                                <Input 
+                                    id="newEmail"
+                                    type="email"
+                                    placeholder="doctor@clinica.com"
+                                    value={form.email}
+                                    onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="newPass">Contraseña provisional</Label>
+                                <div className="relative">
+                                  <Input 
+                                      id="newPass"
+                                      type={showPassword ? "text" : "password"}
+                                      placeholder="******"
+                                      value={form.password}
+                                      onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
+                                      className="pr-10"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-slate-400 hover:text-slate-600"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    title={showPassword ? "Ocultar" : "Mostrar"}
+                                  >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  </Button>
+                                </div>
+                                <p className="text-xs text-slate-400">Mínimo 6 caracteres.</p>
+                            </div>
+                        </div>
+                    )}
+                  </>
+               )}
+            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>

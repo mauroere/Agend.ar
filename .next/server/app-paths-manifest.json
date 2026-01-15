@@ -1,4 +1,9 @@
 {
-  "/book/[tenantId]/page": "app/book/[tenantId]/page.js",
-  "/settings/page": "app/settings/page.js"
+  "/[tenantId]/page": "app/[tenantId]/page.js",
+  "/api/public/check-patient/route": "app/api/public/check-patient/route.js",
+  "/professionals/page": "app/professionals/page.js",
+  "/api/settings/services/route": "app/api/settings/services/route.js",
+  "/api/settings/providers/route": "app/api/settings/providers/route.js",
+  "/api/settings/categories/route": "app/api/settings/categories/route.js",
+  "/api/me/route": "app/api/me/route.js"
 }

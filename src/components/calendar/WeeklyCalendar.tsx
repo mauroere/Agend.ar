@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { AppointmentStatus } from "@/lib/constants";
-import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, Trash2, Stethoscope, TicketCheck, Check } from "lucide-react";
 
 type Appointment = {
   id: string;
@@ -19,6 +19,7 @@ type Appointment = {
   locationId?: string;
   service?: string;
   notes?: string;
+  providerId?: string;
 };
 
 const STATUS_CONFIG: Record<AppointmentStatus, { label: string; color: string; bg: string }> = {
@@ -32,8 +33,12 @@ const STATUS_CONFIG: Record<AppointmentStatus, { label: string; color: string; b
 
 type WeeklyCalendarProps = {
   appointments: Appointment[];
+  providers?: { id: string; full_name: string }[];
   onCreate?: () => void;
   onSelect?: (appt: Appointment) => void;
+  onConfirm?: (appt: Appointment) => void;
+  onCancel?: (appt: Appointment) => void;
+  onAttend?: (appt: Appointment) => void;
   isLoading?: boolean;
 };
 
@@ -46,7 +51,7 @@ const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
 
 type ViewMode = 'day' | 'week' | 'month';
 
-export function WeeklyCalendar({ appointments, onCreate, onSelect, isLoading }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ appointments, providers = [], onCreate, onSelect, onCancel, onConfirm, onAttend, isLoading }: WeeklyCalendarProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [date, setDate] = useState(new Date());
 
@@ -191,9 +196,49 @@ export function WeeklyCalendar({ appointments, onCreate, onSelect, isLoading }: 
                                </div>
                                <div className="flex-1 space-y-1 overflow-y-auto max-h-[100px] scrollbar-hide">
                                    {items.slice(0, 4).map(appt => (
-                                       <div key={appt.id} className={cn("px-1.5 py-0.5 rounded text-[10px] truncate font-medium flex items-center gap-1", STATUS_CONFIG[appt.status].bg.replace('bg-', 'bg-opacity-20 bg-').replace('bg-opacity-20', 'bg-opacity-25 text-slate-700'))} onClick={(e) => { e.stopPropagation(); onSelect?.(appt); }}>
-                                           <div className={cn("w-1 h-1 rounded-full shrink-0", STATUS_CONFIG[appt.status].bg)}></div>
-                                           {appt.patient}
+                                       <div 
+                                         key={appt.id} 
+                                         title={`${appt.patient} - ${STATUS_CONFIG[appt.status].label}${providers.find(p => p.id === appt.providerId) ? ` - ${providers.find(p => p.id === appt.providerId)?.full_name}` : ''}`} 
+                                         className={cn(
+                                             "group px-1.5 py-1 rounded text-[10px] truncate font-medium flex items-center justify-between gap-1 pr-1 relative", // Added relative and py-1
+                                             STATUS_CONFIG[appt.status].bg.replace('bg-', 'bg-opacity-20 bg-').replace('bg-opacity-20', 'bg-opacity-25 text-slate-700')
+                                         )} 
+                                         onClick={(e) => { e.stopPropagation(); onSelect?.(appt); }}
+                                       >
+                                           <div className="flex items-center gap-1 overflow-hidden">
+                                               <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_CONFIG[appt.status].bg)}></div>
+                                               <span className="truncate">{appt.patient}</span>
+                                           </div>
+                                           
+                                           <div className="flex items-center gap-1 bg-white shadow-sm border border-slate-100 rounded-md px-1 py-0.5 absolute right-0.5 top-1/2 -translate-y-1/2 z-10">
+                                                {appt.status === 'pending' && onConfirm && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); onConfirm(appt); }} 
+                                                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1 rounded-sm transition-colors" 
+                                                        title="Confirmar"
+                                                    >
+                                                        <Check className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                                {appt.status !== 'canceled' && appt.status !== 'completed' && onAttend && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); onAttend(appt); }} 
+                                                        className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 p-1 rounded-sm transition-colors" 
+                                                        title="Atender"
+                                                    >
+                                                        <Stethoscope className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                                {appt.status !== 'canceled' && onCancel && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); onCancel(appt); }} 
+                                                        className="text-red-700 hover:text-red-800 hover:bg-red-50 p-1 rounded-sm transition-colors" 
+                                                        title="Anular"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                           </div>
                                        </div>
                                    ))}
                                    {items.length > 4 && (
@@ -300,8 +345,9 @@ export function WeeklyCalendar({ appointments, onCreate, onSelect, isLoading }: 
                             return (
                                 <div
                                 key={appt.id}
+                                title={`${appt.patient} - ${STATUS_CONFIG[appt.status].label} - ${providers.find(p => p.id === appt.providerId)?.full_name ?? 'Sin profesional'}`}
                                 className={cn(
-                                    "absolute left-0.5 right-1.5 rounded-md border text-xs cursor-pointer shadow-sm transition-all hover:shadow-md z-10 overflow-hidden flex flex-col pl-1.5 py-1",
+                                    "group absolute left-0.5 right-1.5 rounded-md border text-xs cursor-pointer shadow-sm transition-all hover:shadow-md z-10 overflow-hidden flex flex-col pl-1.5 py-1 pr-1",
                                     "border-l-4", // Thick colored left border
                                     statusConfig.bg.replace("bg-", "bg-opacity-10 bg-").replace("bg-opacity-10", "bg-opacity-15"), // Light bg
                                     statusConfig.bg.replace("bg-", "border-l-") // Colored border
@@ -312,14 +358,56 @@ export function WeeklyCalendar({ appointments, onCreate, onSelect, isLoading }: 
                                     onSelect?.(appt);
                                 }}
                                 >  
-                                    {/* Title / Patient */}
-                                    <div className="font-semibold text-slate-900 leading-tight truncate">
-                                    {appt.patient}
+                                    {/* Quick Actions Overlay - Visible on Hover */}
+                                    <div className="absolute top-1 right-1 flex items-center gap-1.5 bg-white border border-slate-200/60 shadow-md rounded-md p-1 z-30 transform scale-100 transition-transform origin-top-right">
+                                         {appt.status === 'pending' && onConfirm && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); onConfirm(appt); }} 
+                                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1.5 rounded-sm transition-all" 
+                                                title="Confirmar"
+                                            >
+                                                <Check className="h-4 w-4" />
+                                            </button>
+                                         )}
+                                         {appt.status !== 'canceled' && appt.status !== 'completed' && onAttend && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); onAttend(appt); }} 
+                                                className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 p-1.5 rounded-sm transition-all" 
+                                                title="Atender"
+                                            >
+                                                <Stethoscope className="h-4 w-4" />
+                                            </button>
+                                         )}
+                                          {appt.status !== 'canceled' && onCancel && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); onCancel(appt); }} 
+                                                className="text-red-700 hover:text-red-800 hover:bg-red-50 p-1.5 rounded-sm transition-all" 
+                                                title="Anular"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        )}
                                     </div>
-                                    {/* Time + Status */}
-                                    <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1">
-                                        {format(start, "HH:mm")} - {format(addDays(start, 0), "HH:mm")} 
-                                        {height > 40 && (
+
+                                    {/* Title / Patient */}
+                                    <div className="font-semibold text-slate-900 leading-tight truncate flex items-center gap-1">
+                                        {height < 40 && <span className="font-normal text-slate-500 mr-1">{format(start, "HH:mm")}</span>}
+                                        {appt.patient}
+                                    </div>
+                                    
+                                    {/* Time + Status + Provider */}
+                                    <div className="text-[10px] text-slate-500 font-medium truncate flex flex-wrap items-center gap-1 mt-auto leading-none pb-0.5">
+                                        {height >= 40 && <span>{format(start, "HH:mm")}</span>}
+                                        
+                                        <span className={cn("px-1 py-px rounded-[2px] text-[9px] uppercase tracking-wide font-medium bg-white/70 border border-slate-200/50", STATUS_CONFIG[appt.status].color)}>
+                                            {STATUS_CONFIG[appt.status].label}
+                                        </span>
+
+                                        <span className="text-slate-600 truncate max-w-[100px]" title={providers.find(p => p.id === appt.providerId)?.full_name ?? "Sin profesional asignado"}>
+                                            • {providers.find(p => p.id === appt.providerId)?.full_name ?? "Sin prof."}
+                                        </span>
+
+                                        {height > 60 && (
                                         <span>• {appt.service ?? "Consulta"}</span>
                                         )}
                                     </div>

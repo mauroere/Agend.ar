@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { serviceClient } from "@/lib/supabase/service";
-import { sendTextMessage } from "@/lib/whatsapp";
-import { Json } from "@/types/database";
-import type { WhatsAppCredentials } from "@/server/whatsapp-config";
-import { getTenantHeaderInfo } from "@/server/tenant-headers";
-import {
-  getWhatsAppIntegrationByPhoneId,
-  getWhatsAppIntegrationByTenant,
-  getWhatsAppIntegrationByVerifyToken,
+import { 
+    getWhatsAppIntegrationByPhoneId, 
+    getWhatsAppIntegrationByVerifyToken 
 } from "@/server/whatsapp-config";
+import { processBotMessage } from "@/lib/bot/engine";
+import { serviceClient } from "@/lib/supabase/service";
+
 
 function normalizePhone(phone: string) {
   return phone.startsWith("+") ? phone : `+${phone}`;
@@ -136,26 +133,20 @@ async function handleReply({
   }
 }
 
+// Verification Endpoint (GET)
 export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  const mode = url.searchParams.get("hub.mode");
-  const token = url.searchParams.get("hub.verify_token");
-  const challenge = url.searchParams.get("hub.challenge");
+  const { searchParams } = new URL(request.url);
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token && challenge) {
-    if (serviceClient) {
-      const integration = await getWhatsAppIntegrationByVerifyToken(serviceClient, token);
-      if (integration) {
-        return new NextResponse(challenge, { status: 200 });
-      }
-    }
-
-    if (token === process.env.WHATSAPP_VERIFY_TOKEN) {
-      return new NextResponse(challenge, { status: 200 });
-    }
+  if (mode === "subscribe" && token) {
+     const integration = await getWhatsAppIntegrationByVerifyToken(serviceClient, token);
+     if (integration) {
+       return new NextResponse(challenge, { status: 200 });
+     }
   }
-
-  return new NextResponse("forbidden", { status: 403 });
+  return new NextResponse("Forbidden", { status: 403 });
 }
 
 async function updateMessageStatus(statusObj: any) {
@@ -172,129 +163,47 @@ async function updateMessageStatus(statusObj: any) {
   }
 }
 
+// Message Handler (POST)
 export async function POST(request: NextRequest) {
-  const client = serviceClient;
-  if (!client) {
-    console.error("Supabase service client unavailable for WhatsApp webhook");
-    return NextResponse.json({ error: "service_unavailable" }, { status: 500 });
-  }
-
-  const payload = await request.json();
-  const entries = payload.entry ?? [];
-  const headerInfo = getTenantHeaderInfo(request.headers as Headers);
-  const tenantFromHeader = headerInfo.internalId ?? undefined;
-  
-  const tenantCredentialCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByTenant>>>();
-  const phoneLookupCache = new Map<string, Awaited<ReturnType<typeof getWhatsAppIntegrationByPhoneId>>>();
-
-  const resolveTenant = async (metadata: Record<string, any> | undefined) => {
-    // 1. Try resolving via Header (if routed internally) or Metadata
-    const candidateTenant = tenantFromHeader ?? metadata?.tenant_id;
+  try {
+    const body = await request.json();
+    const entry = body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
     
-    if (candidateTenant) {
-      if (!tenantCredentialCache.has(candidateTenant)) {
-        tenantCredentialCache.set(candidateTenant, await getWhatsAppIntegrationByTenant(client, candidateTenant));
-      }
-      return {
-        tenantId: candidateTenant,
-        credentials: tenantCredentialCache.get(candidateTenant) ?? null,
-      };
+    if (!value) return NextResponse.json({ status: "ignored" });
+
+    // Identify Tenant by Phone ID Receiver
+    const phoneNumberId = value.metadata?.phone_number_id;
+    if (!phoneNumberId) return NextResponse.json({ status: "ignored" });
+
+    const integration = await getWhatsAppIntegrationByPhoneId(serviceClient, phoneNumberId);
+    if (!integration) {
+        console.warn(`[Webhook] No tenant found for PhoneID ${phoneNumberId}`);
+        return NextResponse.json({ status: "ignored" }); // Don't error, just ignore
     }
 
-    // 2. Try resolving via Phone Number ID
-    const phoneNumberId = metadata?.phone_number_id;
-    if (phoneNumberId) {
-      if (!phoneLookupCache.has(phoneNumberId)) {
-        phoneLookupCache.set(phoneNumberId, await getWhatsAppIntegrationByPhoneId(client, phoneNumberId));
-      }
-      const match = phoneLookupCache.get(phoneNumberId);
-      if (match) {
-        if(!tenantCredentialCache.has(match.tenantId)) {
-             tenantCredentialCache.set(match.tenantId, match.credentials); 
-        }
-        return match;
-      }
+    const message = value.messages?.[0];
+    if (message) {
+       // Only handle text messages for now
+       if (message.type === "text") {
+           const from = message.from; // e.g. "54911..."
+           const text = message.text.body;
+           const userName = value.contacts?.[0]?.profile?.name || "Usuario";
+           
+           await processBotMessage(
+               integration.tenant_id, 
+               "+" + from, // Ensure E.164
+               text, 
+               userName, 
+               integration.credentials_parsed
+           );
+       }
     }
 
-    return null;
-  };
-
-  for (const entry of entries) {
-    for (const change of entry.changes ?? []) {
-      const value = change.value;
-      if (!value) continue;
-
-      // --- HANDLE STATUS UPDATES ---
-      if (value.statuses) {
-        for (const status of value.statuses) {
-          await updateMessageStatus(status);
-        }
-      }
-
-      // --- HANDLE INCOMING MESSAGES ---
-      if (value.messages) {
-        const resolution = await resolveTenant(value.metadata);
-        
-        if (!resolution) {
-          console.log("Could not resolve tenant for incoming message", JSON.stringify(value.metadata));
-          continue;
-        }
-
-        const { tenantId, credentials } = resolution;
-        
-        for (const message of value.messages) {
-          const from = normalizePhone(message.from);
-          
-          const { data: patient } = await client
-            .from("agenda_patients")
-            .select("id, tenant_id, opt_out")
-            .eq("phone_e164", from)
-            .eq("tenant_id", tenantId)
-            .single();
-
-          if (!patient) {
-              console.log(`Unknown patient number ${from} for tenant ${tenantId}`);
-              continue;
-          }
-
-          await logMessage({
-            tenantId,
-            patientId: patient.id,
-            direction: "in",
-            type: message.type ?? null,
-            status: "received",
-            waMessageId: message.id,
-            payload: message as Json,
-          });
-
-          // Extract content
-          let bodyText = "";
-          
-          if (message.type === "text") {
-            bodyText = message.text?.body ?? "";
-          } else if (message.type === "interactive") {
-            if (message.interactive?.type === "button_reply") {
-                bodyText = message.interactive.button_reply?.title ?? ""; // Use title (e.g. "Confirmar") to match logic
-            } else if (message.interactive?.type === "list_reply") {
-                bodyText = message.interactive.list_reply?.title ?? "";
-            }
-          } else if (message.type === "button") {
-             bodyText = message.button?.text ?? "";
-          }
-
-          if (bodyText) {
-            await handleReply({
-              tenantId,
-              patientId: patient.id,
-              phone: from,
-              text: bodyText,
-              credentials,
-            });
-          }
-        }
-      }
-    }
+    return NextResponse.json({ status: "ok" });
+  } catch (err) {
+    console.error("[Webhook Error]", err);
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }

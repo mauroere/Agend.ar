@@ -4,6 +4,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { isWithinBusinessHours } from "@/lib/scheduling";
 import { getRouteSupabase } from "@/lib/supabase/route";
 import { serviceClient } from "@/lib/supabase/service";
+import { normalizePhoneNumber } from "@/lib/normalization";
 import { Database } from "@/types/database";
 import { getTenantHeaderInfo } from "@/server/tenant-headers";
 
@@ -98,7 +99,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const existingDuration = differenceInMinutes(new Date(typedExisting.end_at), new Date(typedExisting.start_at));
 
-  const normalizedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+  const normalizedPhone = normalizePhoneNumber(phone);
 
   // PATCH: DB columns missing
   const nextServiceId: string | null = hasServiceId ? (serviceId ?? null) : null; // typedExisting.service_id ?? null;
@@ -329,7 +330,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .select("id, start_at, end_at, status")
     .single();
 
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
+  if (updateError) {
+      if (updateError.code === "23P01" || updateError.message?.includes("agenda_chk_no_overlap")) {
+           return NextResponse.json({ error: "El horario seleccionado ya está ocupado por otro turno (conflicto detectado)." }, { status: 409 });
+      }
+      return NextResponse.json({ error: updateError.message }, { status: 400 });
+  }
 
   return NextResponse.json({ ok: true, appointment: updated });
 }

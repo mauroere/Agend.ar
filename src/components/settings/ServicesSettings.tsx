@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Plus, Edit3, DollarSign } from "lucide-react";
 import { UploadDropzone } from "@/components/uploader/UploadDropzone";
 import { cn } from "@/lib/utils";
+import { CategoriesSettings } from "./CategoriesSettings";
+import { Select } from "@/components/ui/select";
 
 function createEmptyForm() {
   return {
@@ -21,6 +23,7 @@ function createEmptyForm() {
     currency: "ARS",
     color: "",
     imageUrl: "",
+    categoryId: "",
   };
 }
 
@@ -43,6 +46,7 @@ type ServiceRecord = {
   image_url: string | null;
   active: boolean;
   sort_order: number;
+  category_id: string | null;
 };
 
 function formatPrice(minorUnits: number | null, currency: string) {
@@ -52,7 +56,9 @@ function formatPrice(minorUnits: number | null, currency: string) {
 }
 
 export function ServicesSettings() {
+  const [view, setView] = useState<"services" | "categories">("services");
   const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -63,10 +69,18 @@ export function ServicesSettings() {
   const loadServices = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/settings/services");
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.error ?? "Error al cargar servicios");
-      setServices(payload.services ?? []);
+      const [servicesRes, categoriesRes] = await Promise.all([
+         fetch("/api/settings/services"),
+         fetch("/api/settings/categories")
+      ]);
+      
+      const servicesData = await servicesRes.json();
+      const categoriesData = await categoriesRes.json();
+
+      if (!servicesRes.ok) throw new Error(servicesData?.error ?? "Error al cargar servicios");
+      
+      setServices(servicesData.services ?? []);
+      setCategories(categoriesData.categories ?? []);
     } catch (error) {
       console.error(error);
       toast({
@@ -94,6 +108,7 @@ export function ServicesSettings() {
         currency: service.currency ?? "ARS",
         color: service.color ?? "",
         imageUrl: service.image_url ?? "",
+        categoryId: service.category_id ?? "",
       });
     } else {
       setEditingId(null);
@@ -113,6 +128,7 @@ export function ServicesSettings() {
         currency: form.currency.trim() || "ARS",
         color: form.color.trim() ? form.color.trim() : undefined,
         imageUrl: form.imageUrl.trim() ? form.imageUrl.trim() : undefined,
+        categoryId: form.categoryId.trim() ? form.categoryId : null,
       };
 
       const endpoint = editingId ? `/api/settings/services/${editingId}` : "/api/settings/services";
@@ -163,19 +179,73 @@ export function ServicesSettings() {
 
   const activeServices = useMemo(() => services.filter((s) => s.active), [services]);
   const inactiveServices = useMemo(() => services.filter((s) => !s.active), [services]);
+  
+  if (view === "categories") {
+     return (
+        <Card>
+           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2 border-b border-slate-100">
+              <div>
+                <CardTitle>Categorías y Organización</CardTitle>
+                <CardDescription>Agrupá tus servicios para mostrarlos ordenados.</CardDescription>
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                  <button 
+                     onClick={() => setView("services")}
+                     className="px-3 py-1.5 text-sm font-medium text-slate-500 rounded-md hover:text-slate-900 transition-colors"
+                  >
+                     Servicios
+                  </button>
+                  <button 
+                     onClick={() => setView("categories")}
+                     className="px-3 py-1.5 text-sm font-medium bg-white text-slate-900 shadow-sm rounded-md"
+                  >
+                     Categorías
+                  </button>
+              </div>
+           </CardHeader>
+           <CardContent className="pt-6">
+               <CategoriesSettings />
+           </CardContent>
+        </Card>
+     );
+  }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <div>
-          <CardTitle>Tratamientos & Servicios</CardTitle>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+        <div className="flex flex-col gap-1">
+           <div className="flex items-center justify-between sm:justify-start gap-4">
+              <CardTitle>Tratamientos & Servicios</CardTitle>
+              <div className="sm:hidden flex bg-slate-100 p-1 rounded-lg">
+                  <button onClick={() => setView("services")} className={cn("px-2 py-1 text-xs font-medium rounded", "bg-white shadow")}>Serv.</button>
+                  <button onClick={() => setView("categories")} className={cn("px-2 py-1 text-xs font-medium rounded")}>Cat.</button>
+              </div>
+           </div>
           <CardDescription>Define la carta que verá el paciente al reservar.</CardDescription>
         </div>
-        <Button onClick={() => handleOpen()}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo servicio
-        </Button>
+        
+        <div className="flex flex-col-reverse sm:flex-row gap-3">
+             <div className="hidden sm:flex bg-slate-100 p-1 rounded-lg">
+                  <button 
+                     onClick={() => setView("services")}
+                     className="px-3 py-1.5 text-sm font-medium bg-white text-slate-900 shadow-sm rounded-md"
+                  >
+                     Servicios
+                  </button>
+                  <button 
+                     onClick={() => setView("categories")}
+                     className="px-3 py-1.5 text-sm font-medium text-slate-500 rounded-md hover:text-slate-900 transition-colors"
+                  >
+                     Categorías
+                  </button>
+              </div>
+              
+            <Button onClick={() => handleOpen()} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" /> Nuevo servicio
+            </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pt-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando servicios...
@@ -198,9 +268,16 @@ export function ServicesSettings() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-base font-semibold text-slate-900">{service.name}</p>
-                          <p className="text-xs uppercase tracking-wide text-slate-400">
-                            {service.duration_minutes} min · {formatPrice(service.price_minor_units, service.currency)}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                              {service.category_id && categories.find(c => c.id === service.category_id) && (
+                                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                                    {categories.find(c => c.id === service.category_id)?.name}
+                                  </span>
+                              )}
+                              <p className="text-xs uppercase tracking-wide text-slate-400">
+                                {service.duration_minutes} min · {formatPrice(service.price_minor_units, service.currency)}
+                              </p>
+                          </div>
                         </div>
                         <span
                           className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
@@ -213,18 +290,33 @@ export function ServicesSettings() {
                         </span>
                       </div>
                       {service.description && (
-                        <p className="mt-3 text-sm text-slate-600">{service.description}</p>
+                        <p className="mt-3 text-sm text-slate-600 line-clamp-2">{service.description}</p>
                       )}
-                      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-                        <span>Orden #{service.sort_order}</span>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleOpen(service)}>
-                            <Edit3 className="mr-1 h-4 w-4" /> Editar
+                      
+                      {/* Footer Actions */}
+                      <div className="mt-4 flex items-center justify-end gap-2 text-sm text-slate-500 border-t border-slate-100 pt-3">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 gap-1.5 hover:text-indigo-600"
+                            onClick={() => handleOpen(service)}
+                          >
+                            <Edit3 className="h-4 w-4" /> 
+                            <span className="text-xs font-medium">Editar</span>
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => toggleActive(service)}>
-                            {service.active ? "Pausar" : "Activar"}
+                          
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className={cn(
+                              "h-8 gap-1.5",
+                              service.active ? "hover:text-amber-600 hover:bg-amber-50" : "hover:text-emerald-600 hover:bg-emerald-50"
+                            )}
+                            onClick={() => toggleActive(service)}
+                          >
+                            <span className="text-lg leading-none pb-0.5">{service.active ? "⏸" : "▶"}</span>
+                            <span className="text-xs font-medium">{service.active ? "Pausar" : "Activar"}</span>
                           </Button>
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -253,23 +345,39 @@ export function ServicesSettings() {
                 <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Duración (min)</Label>
-                <div className="relative">
-                   <Input
-                     type="number"
-                     min={5}
-                     step={5}
-                     max={480}
-                     value={form.durationMinutes}
-                     onChange={(e) => setForm((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
-                   />
-                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                     minutos
-                   </span>
-                </div>
-                <p className="text-[10px] text-slate-500">Tiempo que ocupará en la agenda.</p>
+                 <Label>Categoría</Label>
+                 <Select 
+                    value={form.categoryId} 
+                    onChange={(e) => setForm(prev => ({ ...prev, categoryId: e.target.value }))}
+                 >
+                    <option value="">Sin categoría</option>
+                    {categories.map(c => (
+                       <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                 </Select>
               </div>
             </div>
+            
+            <div className="grid gap-4 md:grid-cols-2">
+               <div className="space-y-2">
+                 <Label>Duración (min)</Label>
+                 <div className="relative">
+                    <Input
+                      type="number"
+                      min={5}
+                      step={5}
+                      max={480}
+                      value={form.durationMinutes}
+                      onChange={(e) => setForm((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                      minutos
+                    </span>
+                 </div>
+                 <p className="text-[10px] text-slate-500">Tiempo que ocupará en la agenda.</p>
+               </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Descripción</Label>
               <Textarea

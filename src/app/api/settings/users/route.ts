@@ -66,6 +66,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: inviteError.message }, { status: 400 });
   }
 
+  // FORCE app_metadata update to ensure RLS works
+  if (inviteData?.user) {
+     await serviceClient.auth.admin.updateUserById(inviteData.user.id, {
+        app_metadata: { tenant_id: tenantId }
+     });
+  }
+
   const userId = inviteData.user.id;
 
   // 2. Add to agenda_users
@@ -85,5 +92,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: dbError.message }, { status: 400 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, userId: userId });
 }
+

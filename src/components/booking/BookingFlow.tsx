@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export type BookingService = {
@@ -19,6 +20,7 @@ export type BookingService = {
   currency: string;
   color: string | null;
   image_url: string | null;
+  category_id?: string | null;
 };
 
 export type BookingProvider = {
@@ -27,6 +29,7 @@ export type BookingProvider = {
   bio: string | null;
   color: string | null;
   default_location_id: string | null;
+  avatar_url: string | null;
 };
 
 export type BookingLocation = {
@@ -35,45 +38,24 @@ export type BookingLocation = {
   address: string | null;
 };
 
+export type BookingCategory = {
+  id: string;
+  name: string;
+};
+
 type BookingFlowProps = {
   tenantId: string;
   tenantName: string;
   services: BookingService[];
   providers: BookingProvider[];
   locations: BookingLocation[];
+  categories: BookingCategory[];
   accentColor?: string;
   accentGradient?: string;
   ctaLabel?: string;
   whatsappLink?: string | null;
+  contactPhone?: string | null;
 };
-
-type DurationFilterId = "express" | "standard" | "extended";
-
-const durationOptions: Array<{
-  id: DurationFilterId;
-  label: string;
-  helper: string;
-  predicate: (minutes: number) => boolean;
-}> = [
-  {
-    id: "express",
-    label: "Express",
-    helper: "< 30 min",
-    predicate: (minutes) => minutes < 30,
-  },
-  {
-    id: "standard",
-    label: "Clásicos",
-    helper: "30-60 min",
-    predicate: (minutes) => minutes >= 30 && minutes <= 60,
-  },
-  {
-    id: "extended",
-    label: "Premium",
-    helper: "> 60 min",
-    predicate: (minutes) => minutes > 60,
-  },
-];
 
 function hexToRgba(hex: string, alpha: number) {
   const sanitized = hex.replace("#", "");
@@ -106,7 +88,19 @@ function formatPrice(service: BookingService | null) {
   return formatter.format(service.price_minor_units / 100);
 }
 
-export function BookingFlow({ tenantId, tenantName, services, providers, locations, accentColor, accentGradient, ctaLabel, whatsappLink }: BookingFlowProps) {
+export function BookingFlow({ 
+  tenantId, 
+  tenantName, 
+  services, 
+  providers, 
+  locations, 
+  categories,
+  accentColor, 
+  accentGradient, 
+  ctaLabel, 
+  whatsappLink, 
+  contactPhone 
+}: BookingFlowProps) {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(services[0]?.id ?? null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>(locations[0]?.id ?? "");
@@ -115,15 +109,19 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [patientName, setPatientName] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [serviceQuery, setServiceQuery] = useState("");
-  const [durationFilter, setDurationFilter] = useState<DurationFilterId | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [receiveNotifications, setReceiveNotifications] = useState(true);
   const [stage, setStage] = useState<1 | 2 | 3>(1);
+  const [existingUser, setExistingUser] = useState<{ name: string } | null>(null); // Added for UX
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
   const [lastBookingSummary, setLastBookingSummary] = useState<{
     firstName: string;
     service: string;
@@ -143,27 +141,64 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
     () => locations.find((loc) => loc.id === selectedLocationId) ?? null,
     [locations, selectedLocationId]
   );
+  
+  const computedWhatsAppUrl = useMemo(() => {
+    // If a static link provided (legacy) and no phone for dynamic gen, fallback.
+    // However, if we have contactPhone, we prefer dynamic generation.
+    if (!contactPhone && whatsappLink) return whatsappLink;
+    if (!contactPhone) return null;
+
+    let text = `Hola! Quiero reservar en ${tenantName}.`;
+
+    if (stage === 3 && lastBookingSummary) {
+      text = `Hola! Reservé turno para ${lastBookingSummary.service} el ${lastBookingSummary.date} a las ${lastBookingSummary.time} hs. Tengo una consulta.`;
+    } else if (selectedService) {
+      text = `Hola! Tengo una consulta sobre el tratamiento ${selectedService.name}.`;
+    }
+
+    return `https://wa.me/${contactPhone}?text=${encodeURIComponent(text)}`;
+  }, [contactPhone, whatsappLink, tenantName, selectedService, lastBookingSummary, stage]);
+
   const serviceDuration = selectedService?.duration_minutes ?? 30;
   const filteredServices = useMemo(() => {
     const query = serviceQuery.trim().toLowerCase();
-    const activeDuration = durationFilter
-      ? durationOptions.find((option) => option.id === durationFilter)
-      : null;
 
     return services.filter((service) => {
       const matchesQuery =
         !query ||
         service.name.toLowerCase().includes(query) ||
         (service.description ?? "").toLowerCase().includes(query);
-      const matchesDuration = activeDuration ? activeDuration.predicate(service.duration_minutes) : true;
-      return matchesQuery && matchesDuration;
+        
+      const matchesCategory = categoryFilter
+         ? service.category_id === categoryFilter
+         : true;
+
+      return matchesQuery && matchesCategory;
     });
-  }, [serviceQuery, services, durationFilter]);
+  }, [serviceQuery, services, categoryFilter]);
 
   const accent = accentColor ?? "#a855f7";
   const accentGradientValue = accentGradient ?? null;
   const accentSoft = hexToRgba(accent, 0.15);
-  const accentBackgroundValue = accentGradientValue ?? accent;
+  // Style object for active elements (Buttons, Tabs, Progress)
+  const activeStyle = accentGradientValue 
+     ? { backgroundImage: accentGradientValue, color: "#ffffff", border: "none" } 
+     : { backgroundColor: accent, color: "#ffffff", borderColor: accent };
+  
+  // Style for text-only accents (Headings, Icons)
+  const textAccentStyle = { color: accent };
+
+  // Ref container for scroll
+  const containerRef = useRef<HTMLDivElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExistingUserClick = () => {
+    if (emailInputRef.current) {
+      emailInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      emailInputRef.current.focus();
+    }
+  };
+
   const catalogGallery = [
     "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80",
     "https://images.unsplash.com/photo-1506956191951-7a3a9299fb04?auto=format&fit=crop&w=900&q=80",
@@ -222,8 +257,8 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
       return;
     }
 
-    if (!patientName.trim() || !patientPhone.trim()) {
-      setError("Necesitamos el nombre y teléfono para confirmar");
+    if (!patientName.trim() || !patientPhone.trim() || !patientEmail.trim()) {
+      setError("Necesitamos tu nombre, email y teléfono");
       return;
     }
 
@@ -238,6 +273,7 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
     const payload = {
       tenantId,
       patient: patientName.trim(),
+      email: patientEmail.trim(),
       phone: patientPhone.trim(),
       start: start.toISOString(),
       duration: serviceDuration,
@@ -308,7 +344,7 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
   ];
 
   const canAdvanceStageOne = Boolean(selectedService && selectedDate && selectedSlot);
-  const canSubmitStageTwo = Boolean(patientName.trim() && patientPhone.trim() && selectedSlot);
+  const canSubmitStageTwo = Boolean(patientName.trim() && patientPhone.trim() && patientEmail.trim() && selectedSlot);
 
   const SummaryCard = () => (
     <section className="rounded-3xl border border-slate-100 bg-white px-6 py-6 shadow-[0_10px_30px_rgba(203,213,225,0.3)] transition-all hover:shadow-[0_15px_40px_rgba(203,213,225,0.4)]">
@@ -358,23 +394,43 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
              </div>
              <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">¿Cuándo?</p>
-                <p className="text-sm font-bold text-slate-900 leading-snug">
+                <p className="text-sm font-bold text-slate-900 leading-snug capitalize">
                    {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : "Elegir fecha..."}
                 </p>
+                {selectedSlot && (
+                    <p className="text-sm font-medium text-indigo-600 mt-0.5">
+                        {selectedSlot} hs
+                    </p>
+                )}
              </div>
           </div>
-          {selectedSlot && (
-             <p className="mt-2 pl-[52px] text-xs font-bold text-slate-700 bg-white/50 w-fit px-2 py-0.5 rounded-md border border-slate-200/50">
-                 {selectedSlot} hs
-             </p>
-          )}
+        </div>
+
+        <div className="group relative overflow-hidden rounded-2xl bg-slate-50 p-4 transition-colors hover:bg-indigo-50/50">
+          <div className="flex items-center gap-3">
+             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-rose-500 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+             </div>
+             <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Lugar</p>
+                <p className="text-sm font-bold text-slate-900 leading-snug">{selectedLocation ? selectedLocation.name : "..."}</p>
+                {selectedLocation && selectedLocation.address && (
+                    <p className="text-xs font-medium text-slate-500 mt-0.5 max-w-[180px] break-words leading-tight">
+                        {selectedLocation.address}
+                    </p>
+                )}
+             </div>
+          </div>
         </div>
       </div>
       
       <div className="mt-6 pt-4 border-t border-slate-100">
          <p className="flex items-center gap-2 text-xs text-slate-500">
             <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
-            Reserva segura vía WhatsApp
+            Reserva segura  y rápida!
          </p>
       </div>
     </section>
@@ -389,6 +445,28 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
     </div>
   );
 
+  const handleEmailBlur = async () => {
+    if (!patientEmail || !patientEmail.includes("@")) return;
+    setCheckingEmail(true);
+    try {
+        const res = await fetch("/api/public/check-patient", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: patientEmail, tenantId, tenantSlug: undefined }), // tenantSlug not in props but tenantId is
+        });
+        const data = await res.json();
+        if (data.exists) {
+            setExistingUser({ name: data.name });
+        } else {
+            setExistingUser(null);
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setCheckingEmail(false);
+    }
+  };
+
   const handleRestart = () => {
     setStage(1);
     setSuccess(null);
@@ -400,12 +478,16 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
   };
 
   return (
-    <div id="booking-flow" className="space-y-8 text-slate-900">
+    <div id="booking-flow" className="space-y-8 text-slate-900" ref={containerRef}>
       {/* Mobile Steps Indicator - Simplified */}
       <div className="md:hidden">
          <div className="flex gap-2">
             {[1, 2, 3].map(s => (
-                <div key={s} className={cn("h-1.5 flex-1 rounded-full transition-all duration-500", s <= stage ? "bg-slate-900" : "bg-slate-200")} />
+                <div 
+                    key={s} 
+                    className={cn("h-1.5 flex-1 rounded-full transition-all duration-500", s > stage && "bg-slate-200")} 
+                    style={s <= stage ? (accentGradientValue ? { backgroundImage: accentGradientValue } : { backgroundColor: accent }) : undefined}
+                />
             ))}
          </div>
          <p className="mt-3 text-lg font-bold text-slate-900">{wizardStages[stage-1].title}</p>
@@ -421,9 +503,10 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                         if (step.id < stage) setStage(step.id);
                     }}
                     disabled={step.id > stage}
+                    style={stage === step.id ? activeStyle : undefined}
                     className={cn(
                         "rounded-full px-6 py-2 text-sm font-semibold transition-all duration-300",
-                        stage === step.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
+                        stage !== step.id && "text-slate-500 hover:text-slate-700",
                         step.id > stage && "opacity-50 cursor-not-allowed hover:text-slate-500"
                     )}
                   >
@@ -458,36 +541,37 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                 )}
               </div>
 
-              {!emptyCatalog ? (
+              {!emptyCatalog && categories.length > 0 ? (
                 <div className="mt-8 flex flex-wrap gap-3 pb-2">
                   <button
                     type="button"
-                    onClick={() => setDurationFilter(null)}
+                    onClick={() => setCategoryFilter(null)}
+                    style={!categoryFilter ? activeStyle : undefined}
                     className={cn(
                       "rounded-full border px-5 py-2.5 text-xs font-bold uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md",
-                      !durationFilter 
-                        ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+                      !categoryFilter 
+                        ? "border-transparent text-white"
                         : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
                     )}
                   >
                     Todas
                   </button>
-                  {durationOptions.map((option) => {
-                    const active = durationFilter === option.id;
+                  {categories.map((cat) => {
+                    const active = categoryFilter === cat.id;
                     return (
                       <button
-                        key={option.id}
+                        key={cat.id}
                         type="button"
-                        onClick={() => setDurationFilter(active ? null : option.id)}
+                        onClick={() => setCategoryFilter(active ? null : cat.id)}
+                        style={active ? activeStyle : undefined}
                         className={cn(
-                          "rounded-full border px-5 py-2.5 text-left text-xs uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md",
+                          "rounded-full border px-5 py-2.5 text-left text-xs font-bold uppercase tracking-[0.15em] transition-all duration-300 shadow-sm hover:shadow-md",
                           active
-                            ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+                            ? "border-transparent text-white"
                             : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
                         )}
                       >
-                        <span className="font-bold">{option.label}</span>
-                        <span className={cn("ml-2 text-[10px] normal-case tracking-normal opacity-70", active ? "text-slate-200" : "text-slate-400")}>{option.helper}</span>
+                        {cat.name}
                       </button>
                     );
                   })}
@@ -591,12 +675,15 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                       type="button"
                       onClick={() => setSelectedProviderId(null)}
                       className={cn(
-                        "rounded-full px-5 py-2.5 text-sm font-medium transition-all",
+                        "group relative flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all overflow-hidden",
                         !selectedProviderId 
                             ? "bg-slate-900 text-white shadow-md" 
                             : "bg-white text-slate-600 shadow-sm hover:shadow-md hover:text-slate-900"
                       )}
                     >
+                      <div className="flex -ml-2 h-16 w-16 items-center justify-center rounded-full bg-slate-200 text-xs font-bold uppercase text-slate-500">
+                          Todos
+                      </div>
                       Cualquiera
                     </button>
                     {providers.map((provider) => (
@@ -605,12 +692,31 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                         type="button"
                         onClick={() => setSelectedProviderId(provider.id)}
                         className={cn(
-                           "rounded-full px-5 py-2.5 text-sm font-medium transition-all",
+                           "group relative flex items-center gap-2 rounded-full px-2 py-2 text-sm font-medium transition-all pr-5 overflow-hidden",
                            selectedProviderId === provider.id
                                ? "bg-slate-900 text-white shadow-md" 
                                : "bg-white text-slate-600 shadow-sm hover:shadow-md hover:text-slate-900"
                         )}
                       >
+                         <div className="relative h-16 w-16 overflow-hidden rounded-full border border-white/50 bg-slate-200">
+                            {provider.avatar_url ? (
+                                <Image
+                                  src={provider.avatar_url}
+                                  alt={provider.full_name}
+                                  width={64}
+                                  height={64}
+                                  className="h-full w-full object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-slate-300 text-sm font-bold uppercase text-slate-600">
+                                   {provider.full_name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .slice(0, 2)
+                                      .join("")}
+                                </div>
+                            )}
+                         </div>
                         {provider.full_name}
                       </button>
                     ))}
@@ -624,11 +730,11 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                           <path fillRule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
                        </svg>
                     </span>
-                    Sede
+                    Lugar
                   </h4>
                   <div className="relative">
                     <select
-                      className="w-full appearance-none rounded-2xl border-none bg-white p-4 pr-10 text-sm font-medium text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-slate-900"
+                      className="w-full appearance-none rounded-2xl border-none bg-white p-4 pr-10 text-base font-medium text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-slate-900"
                       value={selectedLocationId}
                       onChange={(event) => setSelectedLocationId(event.target.value)}
                     >
@@ -665,7 +771,7 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                     selected={selectedDate}
                     onSelect={(date) => setSelectedDate(date ?? undefined)}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                    className="rounded-3xl border-none bg-slate-50/50 p-6 shadow-inner"
+                    className="rounded-3xl border-none bg-slate-50/50 p-3 shadow-inner sm:p-6"
                     classNames={{
                         day_selected: "bg-slate-900 text-white hover:bg-slate-800 focus:bg-slate-900",
                         day_today: "bg-slate-100 text-slate-900 font-bold",
@@ -679,10 +785,10 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                          <span className="text-xs text-slate-400">{serviceDuration} min de duración</span>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-3 xl:grid-cols-4">
                       {loadingSlots ? (
                          Array.from({ length: 8 }).map((_, i) => (
-                            <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
+                            <div key={i} className="h-10 animate-pulse rounded-full bg-slate-100" />
                          ))
                       ) : availableSlots.length > 0 ? (
                         availableSlots.map((slot) => (
@@ -691,18 +797,21 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                             type="button"
                             onClick={() => setSelectedSlot(slot)}
                             className={cn(
-                              "relative flex items-center justify-center rounded-xl p-2 text-sm font-bold transition-all duration-300 border border-transparent min-h-[46px]",
+                              "relative flex items-center justify-center rounded-full py-2 px-4 text-sm font-semibold transition-all duration-200 border",
                               selectedSlot === slot 
-                                ? "bg-slate-900 text-white shadow-md scale-105 z-10" 
-                                : "bg-slate-50 text-slate-700 hover:bg-white hover:border-slate-200 hover:shadow-md hover:-translate-y-1 hover:text-slate-900"
+                                ? "border-slate-900 bg-slate-900 text-white shadow-md transform scale-105" 
+                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900"
                             )}
                           >
                             {slot}
                           </button>
                         ))
                       ) : (
-                        <div className="col-span-full py-8 text-center">
-                            <p className="text-slate-500">No hay disponibilidad para esta fecha.</p>
+                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center opacity-60">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-300 mb-2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-sm font-medium text-slate-500">Sin horarios disponibles</p>
                         </div>
                       )}
                     </div>
@@ -722,7 +831,15 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                       onClick={() => {
                         setStage(2);
                         setError(null);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        
+                        // Scroll to container top instead of window top
+                        if (containerRef.current) {
+                           const yOffset = -20; // small offset for breathing room
+                           const y = containerRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                           window.scrollTo({ top: y, behavior: 'smooth' });
+                        } else {
+                           window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
                       }}
                       disabled={!canAdvanceStageOne}
                       className={cn(
@@ -756,12 +873,23 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
         <div className="grid gap-8 lg:grid-cols-[1fr,380px]">
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
              <div className="rounded-[2.5rem] bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10">
-                <div className="mb-8">
-                  <h3 className="text-2xl font-bold tracking-tight text-slate-900">Tus datos</h3>
-                  <p className="mt-1 text-slate-500">¿A dónde te enviamos la confirmación?</p>
+                <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                      <h3 className="text-2xl font-bold tracking-tight text-slate-900">Tus datos</h3>
+                      <p className="mt-1 text-slate-500">¿A dónde te enviamos la confirmación?</p>
+                  </div>
+                  <Button onClick={handleExistingUserClick} variant="outline" size="sm" className="hidden sm:flex rounded-full text-indigo-600 border-indigo-100 bg-indigo-50 hover:bg-indigo-100">
+                      Ya tengo cuenta
+                  </Button>
                 </div>
 
                 <div className="grid gap-6">
+                  {/* Login CTA Mobile */}
+                  <div className="sm:hidden rounded-xl bg-indigo-50 p-4 mb-2 flex items-center justify-between">
+                      <span className="text-sm font-medium text-indigo-900">¿Ya sos paciente?</span>
+                      <Button onClick={handleExistingUserClick} variant="ghost" size="sm" className="text-indigo-600 font-bold p-0 h-auto hover:bg-transparent hover:underline">Iniciá sesión</Button>
+                  </div>
+
                   <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                           <label className="text-sm font-semibold text-slate-700 ml-1">Nombre completo</label>
@@ -781,6 +909,60 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                             className="h-12 rounded-xl border-slate-200 bg-slate-50 px-4 text-base focus:border-slate-900 focus:ring-slate-900"
                           />
                       </div>
+                  </div>
+
+                  <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700 ml-1">Email (para tu cuenta)</label>
+                      <div className="relative">
+                        <Input
+                            ref={emailInputRef}
+                            type="email"
+                            placeholder="tu@email.com"
+                            value={patientEmail}
+                            onChange={(event) => setPatientEmail(event.target.value)}
+                            onBlur={handleEmailBlur}
+                            className={cn(
+                                "h-12 rounded-xl border-slate-200 bg-slate-50 px-4 text-base focus:border-slate-900 focus:ring-slate-900",
+                                existingUser && "border-indigo-300 bg-indigo-50/50"
+                            )}
+                        />
+                        {checkingEmail && (
+                            <div className="absolute right-3 top-3.5">
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                            </div>
+                        )}
+                      </div>
+                      
+                      {existingUser ? (
+                          <div className="rounded-lg bg-indigo-50 p-3 mt-2 flex flex-col gap-2 border border-indigo-100 animate-in fade-in slide-in-from-top-2">
+                             <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-200 text-indigo-700">
+                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-5.5-2.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM10 12a5.99 5.99 0 00-4.793 2.39A9.916 9.916 0 0010 18c2.695 0 5.13-1.07 6.793-2.61A5.99 5.99 0 0010 12z" clipRule="evenodd" />
+                                   </svg>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-indigo-900">¡Hola {existingUser.name.split(" ")[0]}!</p>
+                                    <p className="text-xs text-indigo-700 leading-snug">
+                                        Vemos que ya tenés cuenta. Si querés que este turno quede en tu historial, te recomendamos iniciar sesión.
+                                    </p>
+                                </div>
+                             </div>
+                             <div className="flex gap-2 pl-8">
+                                <Button size="sm" variant="primary" className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-4">
+                                    Iniciar sesión
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 text-xs text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 rounded-full px-3" onClick={() => setExistingUser(null)}>
+                                    Continuar como invitado
+                                </Button>
+                             </div>
+                          </div>
+                      ) : (
+                        <p className="text-xs text-slate-500 ml-1">
+                            Te crearemos una cuenta para que puedas ver y gestionar tus turnos. 
+                            <span className="text-slate-400 block sm:inline"> Te enviaremos el acceso por mail.</span>
+                        </p>
+                      )}
                   </div>
 
                   <div className="space-y-2">
@@ -910,7 +1092,7 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
                             Reservar otro turno
                          </Button>
                          <a
-                            href={whatsappLink ?? "#"}
+                            href={computedWhatsAppUrl ?? whatsappLink ?? "#"}
                              target="_blank"
                              rel="noreferrer"
                              className="inline-flex h-12 items-center justify-center rounded-full border border-slate-700 bg-transparent px-8 text-base font-bold text-white transition hover:bg-slate-800"
@@ -934,6 +1116,26 @@ export function BookingFlow({ tenantId, tenantName, services, providers, locatio
              </div>
           </aside>
         </div>
+      )}
+
+      {computedWhatsAppUrl && stage !== 3 && (
+        <a
+          href={computedWhatsAppUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Chatear por WhatsApp"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full bg-[#25D366] px-6 py-4 text-base font-bold text-white shadow-[0_10px_40px_rgba(37,211,102,0.4)] transition-all duration-300 hover:scale-110 hover:-translate-y-1"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-6 w-6"
+          >
+            <path fillRule="evenodd" clipRule="evenodd" d="M18.403 5.633A8.919 8.919 0 0 0 12.053 3c-4.948 0-8.976 4.027-8.978 8.977 0 1.582.413 3.126 1.198 4.488L3 21.116l4.759-1.249a8.981 8.981 0 0 0 4.29 1.093h.004c4.947 0 8.975-4.026 8.977-8.977a8.926 8.926 0 0 0-2.627-6.35m-6.35 13.812h-.003a7.446 7.446 0 0 1-3.798-1.041l-.272-.162-2.824.741.753-2.753-.177-.282a7.448 7.448 0 0 1-1.141-3.971c.002-4.114 3.349-7.461 7.465-7.461a7.413 7.413 0 0 1 5.275 2.188 7.42 7.42 0 0 1 2.183 5.279c-.002 4.114-3.349 7.462-7.461 7.462m4.093-5.589c-.225-.113-1.327-.655-1.533-.73-.205-.075-.354-.112-.504.112-.15.224-.579.73-.71.88-.131.15-.262.169-.486.056-.224-.113-.945-.349-1.801-1.113-.667-.595-1.117-1.329-1.248-1.554-.131-.225-.014-.347.099-.458.101-.1.224-.261.336-.393.112-.131.149-.224.224-.374.075-.149.037-.28-.019-.393-.056-.113-.504-1.214-.69-1.663-.181-.435-.366-.376-.504-.383-.131-.006-.28-.008-.429-.008-.15 0-.393.056-.6.28-.206.225-.785.767-.785 1.871 0 1.104.804 2.171.916 2.32.112.15 1.582 2.415 3.832 3.387.536.231.954.369 1.279.473.536.171 1.024.147 1.409.089.429-.064 1.327-.542 1.514-1.066.187-.524.187-.973.131-1.065-.056-.092-.206-.149-.43-.261" />
+          </svg>
+          <span className="hidden sm:inline">WhatsApp</span>
+        </a>
       )}
     </div>
   );

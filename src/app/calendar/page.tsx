@@ -38,8 +38,19 @@ function toMinutes(startAt: string, endAt: string) {
 }
 
 export default async function CalendarPage({ searchParams }: { searchParams: { location?: string } }) {
-  const { supabase, tenantId } = await requireTenantSession();
+  const { supabase, tenantId, session } = await requireTenantSession();
+  // Using serviceClient to ensure data access even if RLS is strict (consistent with TodayPage)
   const db = (serviceClient ?? supabase) as AnySupabaseClient;
+  
+  // 0. Check if current user is a provider to filter view
+  const { data: currentProvider } = await db
+    .from("agenda_providers")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+
+  const viewerProviderId = currentProvider?.id;
   
   type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id" | "name">;
 
@@ -86,7 +97,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     ? searchParams.location
     : locations[0]?.id;
 
-  const { data, error } = await db
+  let query = db
     .from("agenda_appointments")
     .select(
       "id, start_at, end_at, status, location_id, service_id, provider_id, service_name, internal_notes, agenda_patients:patient_id(full_name, phone_e164)"
@@ -94,6 +105,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     .eq("tenant_id", tenantId)
     .gte("start_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Fetch last 30 days
     .order("start_at", { ascending: true });
+
+  if (viewerProviderId) {
+    query = query.eq("provider_id", viewerProviderId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
      console.error("Calendar Page fetch error", error);

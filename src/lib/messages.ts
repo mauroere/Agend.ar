@@ -11,11 +11,12 @@ export type TemplateRunContext = {
   date: string;
   time: string;
   location: string;
+  provider: string; // Added provider
 };
 
 export const templatePreview = {
   [TEMPLATE_NAMES.appointmentCreated]:
-    "Hola {{1}}, agendamos tu turno para {{2}} a las {{3}} en {{4}}. Respondé 1 Confirmar · 2 Reprogramar · 3 Cancelar · STOP para salir.",
+    "Hola {{1}}, agendamos tu turno para {{2}} a las {{3}} en {{4}} con {{5}}. Respondé 1 Confirmar · 2 Reprogramar · 3 Cancelar · STOP para salir.",
   [TEMPLATE_NAMES.appointmentConfirmed]:
     "¡Turno confirmado {{1}}! Te esperamos el {{2}} a las {{3}}. Gracias por confirmar.",
   [TEMPLATE_NAMES.reminder24h]:

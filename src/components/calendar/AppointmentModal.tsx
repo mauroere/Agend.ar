@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, addMinutes, parse } from "date-fns";
+import { ConsultationModal } from "@/components/medical/ConsultationModal";
+import { Stethoscope } from "lucide-react";    // FIND: {isEdit ? "Guardar Cambios" : "Confirmar Turno"}
+    
+    // Logic: If appointment exists and is not canceled/completed, show "Atender"
 import { es } from "date-fns/locale";
 import { AppointmentStatus } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
@@ -13,6 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { X, Loader2, Calendar as CalendarIcon, Clock, Check, UserPlus, Search, Info, Sparkles, Trash2, Ban } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { validateAndFormatPhone } from "@/lib/phone-utils";
 import { CreatePatientDialog } from "@/components/patients/CreatePatientDialog";
 
 // ... type definitions same ...
@@ -99,8 +105,20 @@ export function AppointmentModal({ locations, services, providers, open: control
 
 	const [form, setForm] = useState<FormValues>({ ...INITIAL_FORM, date: new Date() });
 	const [locationId, setLocationId] = useState<string>(locations[0]?.id ?? "");
+
+  // Auto-select first provider if none selected
+  useEffect(() => {
+    if (!form.providerId && providers.length > 0) {
+       // Prefer default for this location, or just first one
+       const defaultForLoc = providers.find(p => p.default_location_id === locationId);
+       const target = defaultForLoc ?? providers[0];
+       setForm(prev => ({ ...prev, providerId: target.id }));
+    }
+  }, [providers, locationId, form.providerId]);
+
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+    const [phoneError, setPhoneError] = useState<string | null>(null);
 	const hasLocations = locations.length > 0;
 	const router = useRouter();
 	const isEdit = Boolean(appointment);
@@ -112,6 +130,7 @@ export function AppointmentModal({ locations, services, providers, open: control
   const [patientLoading, setPatientLoading] = useState(false);
   const patientFieldRef = useRef<HTMLDivElement | null>(null);
   const [showCreatePatient, setShowCreatePatient] = useState(false);
+  const [attendOpen, setAttendOpen] = useState(false); // Medical Module
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   
@@ -298,6 +317,7 @@ export function AppointmentModal({ locations, services, providers, open: control
 		if (!hasLocations) return setError("Falta configurar Consultorio");
 		if (!form.patient) return setError("Seleccione un paciente");
     if (!form.date || !form.time) return setError("Seleccione fecha y hora");
+    if (!form.providerId) return setError("Debe asignar un profesional obligatoriamente");
 
     let startIso = "";
     if (form.date && form.time) {
@@ -318,6 +338,16 @@ export function AppointmentModal({ locations, services, providers, open: control
        return setError("Fecha inválida");
     }
 
+    let phoneToSend = form.phone;
+    if (form.phone) {
+        const { isValid, formatted, error } = validateAndFormatPhone(form.phone);
+        if (!isValid) {
+            setPhoneError(error || "Número inválido");
+            return setError("El teléfono ingresado no es válido. Corregí el formato.");
+        }
+        if (formatted) phoneToSend = formatted;
+    }
+
 		setLoading(true);
 		setError(null);
 		try {
@@ -325,7 +355,7 @@ export function AppointmentModal({ locations, services, providers, open: control
 			const method = appointment ? "PATCH" : "POST";
       const payload: Record<string, any> = {
             patient: form.patient,
-            phone: form.phone,
+            phone: phoneToSend,
             start: startIso,
             duration: form.duration,
             service: form.service,
@@ -509,16 +539,31 @@ export function AppointmentModal({ locations, services, providers, open: control
                      </div>
                      
                      {/* Manual Phone Override */}
-                     <div className="relative">
-                        <Input 
-                          value={form.phone}
-                          onChange={(e) => handleChange("phone", e.target.value)}
-                          placeholder="+54 9 11..." 
-                          className="pl-8 text-sm"
-                        />
-                        <span className="absolute left-2.5 top-2.5 text-slate-400">
-                           <Info className="h-4 w-4" />
-                        </span>
+                     <div className="relative space-y-1">
+                        <div className="relative">
+                            <Input 
+                              value={form.phone}
+                              onChange={(e) => {
+                                handleChange("phone", e.target.value);
+                                if (phoneError) setPhoneError(null);
+                              }}
+                              onBlur={() => {
+                                if (!form.phone) return;
+                                const { isValid, formatted, error } = validateAndFormatPhone(form.phone);
+                                if (!isValid) {
+                                  setPhoneError(error || "Número inválido");
+                                } else if (formatted) {
+                                  handleChange("phone", formatted);
+                                }
+                              }}
+                              placeholder="+54 9 11..." 
+                              className={cn("pl-8 text-sm", phoneError ? "border-red-500 ring-red-500" : "")}
+                            />
+                            <span className="absolute left-2.5 top-2.5 text-slate-400">
+                               <Info className="h-4 w-4" />
+                            </span>
+                        </div>
+                        {phoneError && <p className="text-xs text-red-500 font-medium ml-1">{phoneError}</p>}
                      </div>
                   </div>
 
@@ -590,15 +635,28 @@ export function AppointmentModal({ locations, services, providers, open: control
                             )}
                           >
                             <div className="flex items-center gap-3">
-                              <div
-                                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white"
-                                style={{ background: provider.color ?? "#0ea5e9" }}
-                              >
-                                {provider.full_name
-                                  .split(" ")
-                                  .map((chunk) => chunk[0])
-                                  .slice(0, 2)
-                                  .join("")}
+                              <div className="relative h-10 w-10 flex-shrink-0">
+                                {provider.avatar_url ? (
+                                  <Image 
+                                    src={provider.avatar_url} 
+                                    alt={provider.full_name} 
+                                    width={40}
+                                    height={40}
+                                    unoptimized
+                                    className="h-full w-full rounded-full object-cover shadow-sm border border-slate-100 bg-slate-50"
+                                  />
+                                ) : (
+                                  <div
+                                    className="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold text-white shadow-sm"
+                                    style={{ background: provider.color ?? "#0ea5e9" }}
+                                  >
+                                    {provider.full_name
+                                      .split(" ")
+                                      .map((chunk) => chunk[0])
+                                      .slice(0, 2)
+                                      .join("")}
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-slate-900">{provider.full_name}</p>
@@ -663,10 +721,17 @@ export function AppointmentModal({ locations, services, providers, open: control
                   <div className="space-y-2">
                      <label className="text-sm font-medium text-slate-700">Consultorio</label>
                      <Select value={locationId} onChange={(e) => setLocationId(e.target.value)} disabled={!hasLocations}>
+                        {!hasLocations && <option value="">Sin consultorios disponibles</option>}
                         {locations.map((loc) => (
                            <option key={loc.id} value={loc.id}>{loc.name}</option>
                         ))}
                      </Select>
+                     {!hasLocations && (
+                        <p className="text-xs text-red-500">
+                           No tenés permisos para ver consultorios o no hay ninguno creado. 
+                           <br/> <a href="/api/repair" target="_blank" className="underline">Intentar reparar permisos</a>.
+                        </p>
+                     )}
                   </div>
 
                   <div className="space-y-2">
@@ -797,6 +862,16 @@ export function AppointmentModal({ locations, services, providers, open: control
                 )}
              </div>
              <div className="flex gap-2">
+                {isEdit && appointment?.status !== "canceled" && appointment?.status !== "completed" && (
+                    <Button
+                        type="button"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                        onClick={() => setAttendOpen(true)}
+                    >
+                        <Stethoscope className="h-4 w-4" />
+                        Atender
+                    </Button>
+                )}
                 <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cerrar</Button>
                 <Button type="submit" onClick={handleSubmit} disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -806,6 +881,20 @@ export function AppointmentModal({ locations, services, providers, open: control
           </div>
         </DialogContent>
       </Dialog>
+      
+      {appointment && (
+          <ConsultationModal 
+            open={attendOpen} 
+            onOpenChange={setAttendOpen}
+            appointmentId={appointment.id}
+            patientName={appointment.patient}
+            serviceName={appointment.service ?? "Consulta"}
+            onSuccess={() => {
+                setOpen(false); // Close parent
+                router.refresh();
+            }}
+          />
+      )}
       
       {showCreatePatient && (
          <CreatePatientDialog 

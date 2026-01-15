@@ -40,7 +40,7 @@ async function fetchIntegration(
 ): Promise<(IntegrationRow & { credentials_parsed: WhatsAppCredentials }) | null> {
   let query = db
     .from("agenda_integrations")
-    .select("id, tenant_id, provider, credentials, created_at, updated_at")
+    .select("id, tenant_id, provider, credentials, created_at, updated_at, enabled")
     .eq("provider", PROVIDER)
     .limit(1);
 

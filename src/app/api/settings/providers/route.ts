@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRouteTenantContext } from "@/server/tenant-context";
 import { Database } from "@/types/database";
+import { serviceClient } from "@/lib/supabase/service";
 
 const providerSchema = z.object({
   fullName: z.string().min(2).max(160),
@@ -13,6 +14,9 @@ const providerSchema = z.object({
   specialties: z.array(z.string().max(60)).optional(),
   metadata: z.record(z.any()).optional().nullable(),
   serviceIds: z.array(z.string().uuid()).optional(),
+  // New fields for Account Creation
+  email: z.string().email().optional(),
+  password: z.string().min(6).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -22,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   const { data: providers, error } = await db
     .from("agenda_providers")
-    .select("id, full_name, bio, avatar_url, color, default_location_id, active, specialties, metadata")
+    .select("id, full_name, bio, avatar_url, color, default_location_id, active, specialties, metadata, user_id")
     .eq("tenant_id", tenantId)
     .order("active", { ascending: false })
     .order("full_name", { ascending: true });
@@ -38,12 +42,23 @@ export async function GET(request: NextRequest) {
     .in("provider_id", providers?.map(p => p.id) ?? [])
     .returns<Array<{ provider_id: string; service_id: string }>>();
 
-  const providersWithServices = providers?.map(p => ({
-    ...p,
-    serviceIds: servicesMap?.filter(sm => sm.provider_id === p.id).map(sm => sm.service_id) ?? []
-  }));
+  const providersWithServices = await Promise.all(providers?.map(async (p) => {
+    let userEmail = null;
+    if (p.user_id && serviceClient) {
+        // Warning: N+1 issue here, but for settings page with few providers is acceptable for now.
+        // Optimization: could list all users and map, but listUsers pagination is tricky in generic case.
+        const { data: { user } } = await serviceClient.auth.admin.getUserById(p.user_id);
+        userEmail = user?.email ?? null;
+    }
+    
+    return {
+        ...p,
+        email: userEmail,
+        serviceIds: servicesMap?.filter(sm => sm.provider_id === p.id).map(sm => sm.service_id) ?? []
+    };
+  }) ?? []);
 
-  return NextResponse.json({ providers: providersWithServices ?? [] });
+  return NextResponse.json({ providers: providersWithServices });
 }
 
 export async function POST(request: NextRequest) {
@@ -57,7 +72,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { fullName, bio, avatarUrl, color, defaultLocationId, active, specialties, metadata, serviceIds } = parsed.data;
+  const { fullName, bio, avatarUrl, color, defaultLocationId, active, specialties, metadata, serviceIds, email, password } = parsed.data;
+
+  let newUserId: string | null = null;
+
+  // 1. Create User Account if requested
+  if (email && password) {
+      if (!serviceClient) {
+          return NextResponse.json({ error: "Server misconfiguration: No Service Client" }, { status: 500 });
+      }
+
+      // Check if user exists first to avoid ugly errors? 
+      // admin.createUser throws if exists.
+      const { data: userData, error: createError } = await serviceClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { tenant_id: tenantId },
+          app_metadata: { tenant_id: tenantId }
+      });
+
+      if (createError) {
+          console.error("Error creating user:", createError);
+          // If user exists, we might want to fail or just warn. 
+          // For this requirement (ABM), failing is better so they know.
+          return NextResponse.json({ error: `Error creando usuario: ${createError.message}` }, { status: 400 });
+      }
+
+      newUserId = userData.user.id;
+
+      // 2. Add to agenda_users mapping (Role Staff)
+      const { error: mapError } = await serviceClient.from("agenda_users").insert({
+          id: newUserId,
+          tenant_id: tenantId,
+          role: "staff", 
+          is_platform_admin: false 
+      });
+
+      if (mapError) {
+           console.error("Error mapping user:", mapError);
+           // Cleanup? Hard to rollback auth user without more permissions usually, but we try.
+           return NextResponse.json({ error: "Creado en Auth pero falló DB local" }, { status: 500 });
+      }
+  }
 
   const payload: Database["public"]["Tables"]["agenda_providers"]["Insert"] = {
     tenant_id: tenantId,
@@ -69,6 +126,7 @@ export async function POST(request: NextRequest) {
     active: active ?? true,
     specialties: specialties ?? [],
     metadata: metadata ?? {},
+    user_id: newUserId // Link immediately
   };
 
   if (payload.default_location_id) {

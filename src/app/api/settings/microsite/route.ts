@@ -16,7 +16,18 @@ const metadataSchema = z.object({
   contactPhone: z.string().trim().max(40).optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
   schedule: z.string().trim().max(200).optional().nullable(),
+  companyDisplayName: z.string().trim().max(100).optional().nullable(),
 });
+
+const RESERVED_SLUGS = [
+  "login", "register", "signup", "dashboard", "admin", "api", 
+  "static", "media", "assets", "help", "status", 
+  "mail", "email", "webmail", "calendar", "book", "agendar", 
+  "app", "www", "ftp", "beta", "dev", "staging", "test",
+  "support", "config", "settings", "profile", "user", 
+  "account", "billing", "invoice", "payment", "checkout",
+  "auth", "oauth", "callback", "verification", "reset-password"
+];
 
 const payloadSchema = z.object({
   publicSlug: z
@@ -28,6 +39,9 @@ const payloadSchema = z.object({
       message: "Solo minúsculas, números y guiones",
     })
     .transform((value) => value.toLowerCase())
+    .refine((slug) => !RESERVED_SLUGS.includes(slug), {
+        message: "Este nombre de enlace no está disponible (reservado)."
+    })
     .optional(),
   customDomain: z
     .string()

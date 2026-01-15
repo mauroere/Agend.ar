@@ -13,6 +13,7 @@ const bodySchema = z.object({
   imageUrl: z.string().url().optional().nullable(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  categoryId: z.string().uuid().optional().nullable(),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const updates: Database["public"]["Tables"]["agenda_services"]["Update"] = {};
-  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder } = parsed.data;
+  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder, categoryId } = parsed.data;
 
   if (typeof name === "string") updates.name = name;
   if (description !== undefined) updates.description = description;
@@ -43,6 +44,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (imageUrl !== undefined) updates.image_url = imageUrl;
   if (typeof active === "boolean") updates.active = active;
   if (typeof sortOrder === "number") updates.sort_order = sortOrder;
+  if (categoryId !== undefined) updates.category_id = categoryId;
 
   const { error } = await db
     .from("agenda_services")

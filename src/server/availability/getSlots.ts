@@ -112,10 +112,10 @@ export async function fetchAvailabilityData(
   // Fetch Appointments
   let appointments: any[] = [];
   try {
-    // 2026-01-08: REMOVED provider_id selection temporarily if column is missing
+    // 2026-01-08: RESTORED provider_id selection
     const { data: apptData, error: appointmentsError } = await db
         .from("agenda_appointments" as any)
-        .select("start_at, end_at, location_id") // Removed provider_id
+        .select("start_at, end_at, location_id, provider_id") 
         .eq("tenant_id", tenantId)
         .neq("status", "canceled")
         .gte("end_at", startRange.toISOString())
@@ -211,16 +211,20 @@ export function calculateDailySlots(
   
   // Pre-filter blockers for performance
   const blockingAppointments = appointments.filter((appt) => {
-    // If provider_id is missing from fetch, we can't filter by it.
-    // Assume appointments block the location unless we can prove otherwise.
-    /* 
+    // If provider_id is present, we filter by it.
     if (providerId) {
+      // 1. My own appointments block me
       if (appt.provider_id === providerId) return true;
+      
+      // 2. Appointments without provider (Room/Location blocking) block everyone
+      //    (Only if we assume single-room capacity, but typically yes)
       if (!appt.provider_id && appt.location_id === locationId) return true;
+      
+      // 3. Appointments for OTHER providers do NOT block me
       return false;
     }
-    */
-    // Fallback: If appt is in this location, it blocks.
+    
+    // Fallback: If no provider selected (booking 'Any' or checking location), everything in location blocks.
     return appt.location_id === locationId;
   });
 

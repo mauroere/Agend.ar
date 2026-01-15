@@ -13,6 +13,8 @@ type AppointmentsRow = {
   service_name: string | null;
   service_snapshot: Json | null;
   internal_notes: string | null;
+  external_calendar_id?: string | null; // Added
+  external_calendar_provider?: string | null; // Added
   created_by: string | null;
   updated_at: string;
 };
@@ -30,6 +32,8 @@ type AppointmentsInsert = {
   service_name?: string | null;
   service_snapshot?: Json | null;
   internal_notes?: string | null;
+  external_calendar_id?: string | null; // Added
+  external_calendar_provider?: string | null; // Added
   created_by?: string | null;
   updated_at?: string;
 };
@@ -48,6 +52,7 @@ type ServicesRow = {
   image_url: string | null;
   active: boolean;
   sort_order: number;
+  category_id?: string | null; // Added
   created_at: string;
   updated_at: string;
 };
@@ -64,6 +69,7 @@ type ServicesInsert = {
   image_url?: string | null;
   active?: boolean;
   sort_order?: number;
+  category_id?: string | null; // Added
   created_at?: string;
   updated_at?: string;
 };
@@ -81,6 +87,7 @@ type ProvidersRow = {
   active: boolean;
   specialties: string[];
   metadata: Json;
+  user_id?: string | null; // Added
   created_at: string;
   updated_at: string;
 };
@@ -96,6 +103,7 @@ type ProvidersInsert = {
   active?: boolean;
   specialties?: string[];
   metadata?: Json;
+  user_id?: string | null; // Added
   created_at?: string;
   updated_at?: string;
 };
@@ -107,6 +115,7 @@ type PatientsRow = {
   tenant_id: string;
   full_name: string;
   phone_e164: string;
+  email?: string | null; // Added
   opt_out: boolean;
   opt_out_at: string | null;
   notes: string | null;
@@ -118,6 +127,7 @@ type PatientsInsert = {
   tenant_id: string;
   full_name: string;
   phone_e164: string;
+  email?: string | null; // Added
   opt_out?: boolean;
   opt_out_at?: string | null;
   notes?: string | null;
@@ -248,6 +258,7 @@ type UsersRow = {
   id: string;
   tenant_id: string;
   role: "owner" | "staff";
+  is_platform_admin?: boolean; // Added
   created_at: string;
 };
 
@@ -255,6 +266,7 @@ type UsersInsert = {
   id?: string;
   tenant_id: string;
   role: "owner" | "staff";
+  is_platform_admin?: boolean; // Added
   created_at?: string;
 };
 
@@ -265,6 +277,7 @@ type IntegrationsRow = {
   tenant_id: string;
   provider: string;
   credentials: Json;
+  enabled: boolean; // Added
   created_at: string;
   updated_at: string;
 };
@@ -274,15 +287,116 @@ type IntegrationsInsert = {
   tenant_id: string;
   provider: string;
   credentials: Json;
+  enabled?: boolean; // Added
   created_at?: string;
   updated_at?: string;
 };
 
 type IntegrationsUpdate = Partial<IntegrationsRow>;
 
+type MedicalRecordsRow = {
+  id: string;
+  tenant_id: string;
+  appointment_id: string;
+  patient_id: string;
+  provider_id: string | null;
+  anamnesis: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type MedicalRecordsInsert = {
+  id?: string;
+  tenant_id: string;
+  appointment_id: string;
+  patient_id: string;
+  provider_id?: string | null;
+  anamnesis?: string | null;
+  diagnosis?: string | null;
+  treatment?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type MedicalRecordsUpdate = Partial<MedicalRecordsRow>;
+
+type MedicalAttachmentsRow = {
+  id: string;
+  record_id: string;
+  file_url: string;
+  file_type: string | null;
+  file_name: string | null;
+  created_at: string;
+};
+
+type MedicalAttachmentsInsert = {
+  id?: string;
+  record_id: string;
+  file_url: string;
+  file_type?: string | null;
+  file_name?: string | null;
+  created_at?: string;
+};
+
+type MedicalAttachmentsUpdate = Partial<MedicalAttachmentsRow>;
+
+type ServiceCategoriesRow = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  color: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+};
+
+type ServiceCategoriesInsert = {
+  id?: string;
+  tenant_id: string;
+  name: string;
+  color?: string | null;
+  sort_order?: number;
+  active?: boolean;
+  created_at?: string;
+};
+
+type ServiceCategoriesUpdate = Partial<ServiceCategoriesRow>;
+
+type ChatSessionsRow = {
+  id: string;
+  tenant_id: string;
+  phone_number: string;
+  step: string;
+  data: Json | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type ChatSessionsInsert = {
+  id?: string;
+  tenant_id: string;
+  phone_number: string;
+  step?: string;
+  data?: Json | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type ChatSessionsUpdate = Partial<ChatSessionsRow>;
+
 export interface Database {
   public: {
     Tables: {
+      agenda_service_categories: {
+        Row: ServiceCategoriesRow;
+        Insert: ServiceCategoriesInsert;
+        Update: ServiceCategoriesUpdate;
+        Relationships: [];
+      };
       agenda_locations: {
         Row: LocationsRow;
         Insert: LocationsInsert;
@@ -337,6 +451,18 @@ export interface Database {
         Update: IntegrationsUpdate;
         Relationships: [];
       };
+      agenda_medical_records: {
+        Row: MedicalRecordsRow;
+        Insert: MedicalRecordsInsert;
+        Update: MedicalRecordsUpdate;
+        Relationships: [];
+      };
+      agenda_medical_attachments: {
+        Row: MedicalAttachmentsRow;
+        Insert: MedicalAttachmentsInsert;
+        Update: MedicalAttachmentsUpdate;
+        Relationships: [];
+      };
       agenda_patients: {
         Row: PatientsRow;
         Insert: PatientsInsert;
@@ -347,6 +473,12 @@ export interface Database {
         Row: AppointmentsRow;
         Insert: AppointmentsInsert;
         Update: AppointmentsUpdate;
+        Relationships: [];
+      };
+      agenda_chat_sessions: {
+        Row: ChatSessionsRow;
+        Insert: ChatSessionsInsert;
+        Update: ChatSessionsUpdate;
         Relationships: [];
       };
     };

@@ -6,11 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, ExternalLink, Save, Key, Smartphone, Building2, ShieldCheck } from "lucide-react";
+import { Loader2, ExternalLink, Save, Key, Smartphone, Building2, ShieldCheck, Lock, Unlock } from "lucide-react";
+
+import { GoogleCalendarCard } from "./GoogleCalendarCard";
 
 export function IntegrationsSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isLocked, setIsLocked] = useState(true); // Locked by default
+  const [hasConfig, setHasConfig] = useState(false); // Track if config exists
+
   const [config, setConfig] = useState({
     phoneNumberId: "",
     businessAccountId: "",
@@ -48,6 +53,18 @@ export function IntegrationsSettings() {
             accessToken: payload.integration.credentials.accessToken || "",
             verifyToken: payload.integration.credentials.verifyToken || "",
           });
+          
+          // Lock if we have substantial data
+          if (payload.integration.credentials.phoneNumberId && payload.integration.credentials.accessToken) {
+              setHasConfig(true);
+              setIsLocked(true);
+          } else {
+              setHasConfig(false);
+              setIsLocked(false);
+          }
+        } else {
+            setHasConfig(false);
+            setIsLocked(false);
         }
       } catch (error) {
         if (!cancelled) {
@@ -91,6 +108,8 @@ export function IntegrationsSettings() {
         title: "Configuración guardada",
         description: "Los datos de integración se han actualizado.",
       });
+      setHasConfig(true);
+      setIsLocked(true); // Lock after saving
     } catch (error) {
       toast({
         title: "Error",
@@ -117,7 +136,10 @@ export function IntegrationsSettings() {
   }
 
   return (
-    <Card>
+    <div className="space-y-6">
+      <GoogleCalendarCard />
+      
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
         <div className="space-y-1">
           <CardTitle>Integración WhatsApp (Meta)</CardTitle>
@@ -133,12 +155,34 @@ export function IntegrationsSettings() {
             </a>
           </CardDescription>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Guardar
-        </Button>
+        
+        <div className="flex gap-2">
+            {hasConfig && isLocked && (
+                <Button variant="outline" onClick={() => setIsLocked(false)}>
+                    <Unlock className="mr-2 h-4 w-4" />
+                    Editar
+                </Button>
+            )}
+            {(!isLocked || !hasConfig) && (
+                <Button onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar
+                </Button>
+            )}
+            {hasConfig && !isLocked && (
+                 <Button variant="ghost" onClick={() => setIsLocked(true)}>
+                    Cancelar
+                </Button>
+            )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {isLocked && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md flex items-center gap-3 text-sm">
+                <Lock className="h-4 w-4" />
+                <span>Esta configuración es crítica. Desbloquea para editar.</span>
+            </div>
+        )}
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="phoneNumberId" className="flex items-center gap-2">
@@ -151,6 +195,7 @@ export function IntegrationsSettings() {
               onChange={(e) => setConfig({ ...config, phoneNumberId: e.target.value })}
               placeholder="Ej: 100609346426084"
               className="font-mono text-sm"
+              disabled={isLocked}
             />
             <p className="text-xs text-slate-500">El ID del número de teléfono configurado en WhatsApp API.</p>
           </div>
@@ -166,6 +211,7 @@ export function IntegrationsSettings() {
               onChange={(e) => setConfig({ ...config, businessAccountId: e.target.value })}
               placeholder="Ej: 100609346426084"
               className="font-mono text-sm"
+              disabled={isLocked}
             />
             <p className="text-xs text-slate-500">El ID de tu cuenta comercial de Meta.</p>
           </div>
@@ -178,11 +224,12 @@ export function IntegrationsSettings() {
           </Label>
           <Input
             id="accessToken"
-            type="password"
+            type={isLocked ? "password" : "text"} // Show text when editing to check content
             value={config.accessToken}
             onChange={(e) => setConfig({ ...config, accessToken: e.target.value })}
             placeholder="EAAG..."
             className="font-mono text-sm"
+            disabled={isLocked}
           />
           <p className="text-xs text-slate-500">Token de acceso del sistema con permisos `whatsapp_business_messaging`.</p>
         </div>
@@ -209,5 +256,6 @@ export function IntegrationsSettings() {
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 }

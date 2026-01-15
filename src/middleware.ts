@@ -69,8 +69,25 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
 
   const { pathname, host } = req.nextUrl;
+  
+  // 1. Resolve Tenant first
+  const tenantResolution = await resolveTenantFromHost(host);
+
+  // 2. Tenant Subdomain Rewrite Logic
+  // If we are at root "/" and have a VALID tenant (with ID), rewrite to booking page.
+  // This effectively makes "/" a public path for tenants (e.g. prueba2.agend.ar loads the book page).
+  if (tenantResolution?.slug && tenantResolution?.id && pathname === "/") {
+    const url = req.nextUrl.clone();
+    url.pathname = `/${tenantResolution.slug}`;
+    const rewriteRes = NextResponse.rewrite(url);
+    if (tenantResolution.id) rewriteRes.headers.set("x-tenant-internal-id", tenantResolution.id);
+    rewriteRes.headers.set("x-tenant-id", tenantResolution.slug);
+    return rewriteRes;
+  }
+
   const isPublic = isPublicPath(pathname);
 
+  // 3. Auth Check
   if (!isPublic && !session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
@@ -78,7 +95,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const tenantResolution = await resolveTenantFromHost(host);
+  // 4. Inject headers
   if (tenantResolution?.slug) {
     res.headers.set("x-tenant-id", tenantResolution.slug);
   }

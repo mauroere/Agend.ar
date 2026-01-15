@@ -24,6 +24,9 @@ async function callWhatsAppAPI({
     throw new Error("WhatsApp credentials missing");
   }
 
+  // Debug log to verify Identity
+  console.log(`[WhatsApp API] Sending via PhoneID: ${phoneNumberId}`);
+
   const res = await fetch(`${baseUrl}/${phoneNumberId}/${path}`, {
     ...init,
     headers: {
@@ -63,6 +66,9 @@ export async function sendTemplateMessage({
     language: { code: languageCode },
   });
 
+  // Sanitize phone number: remove non-numeric characters (e.g. +)
+  const cleanTo = to.replace(/\D/g, "");
+
   return callWhatsAppAPI({
     credentials,
     path: "messages",
@@ -70,7 +76,7 @@ export async function sendTemplateMessage({
       method: "POST",
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        to: cleanTo,
         type: "template",
         template: {
           ...parsedTemplate,

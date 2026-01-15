@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { validateAndFormatPhone } from "@/lib/phone-utils";
 import { Loader2, AlertCircle } from "lucide-react";
 
 type PatientDialogBaseProps = {
@@ -33,8 +34,12 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Field states
   const [fullName, setFullName] = useState(defaultValues?.fullName ?? "");
   const [phone, setPhone] = useState(defaultValues?.phone ?? "");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
   const [optOut, setOptOut] = useState(defaultValues?.optOut ?? false);
 
@@ -45,14 +50,36 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
     setOptOut(defaultValues?.optOut ?? false);
   }, [defaultValues]);
 
+  const handlePhoneBlur = () => {
+    if (!phone) {
+      setPhoneError(null);
+      return;
+    }
+    const { isValid, formatted, error } = validateAndFormatPhone(phone);
+    if (!isValid) {
+      setPhoneError(error || "Número inválido");
+    } else {
+      setPhoneError(null);
+      if (formatted) setPhone(formatted);
+    }
+  };
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    
+    // Final validation before submit
+    const { isValid, formatted } = validateAndFormatPhone(phone);
+    if (phone && !isValid) {
+        setPhoneError("Por favor corrigí el teléfono antes de guardar.");
+        return;
+    }
+
     setLoading(true);
     setError(null);
 
     const payload: Record<string, unknown> = {
       fullName,
-      phone,
+      phone: formatted || phone,
       notes,
     };
 
@@ -115,14 +142,26 @@ export function PatientDialog({ mode, onClose, onSuccess, patientId, defaultValu
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm font-medium leading-none">Teléfono (E.164)</label>
+            <label className="text-sm font-medium leading-none">Teléfono (WhatsApp)</label>
             <Input
               required
-              placeholder="+54911..."
+              type="tel"
+              placeholder="+54 9 11 1234 5678"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (phoneError) setPhoneError(null); // Clear error on edit
+              }}
+              onBlur={handlePhoneBlur}
+              className={phoneError ? "border-red-500 ring-red-500" : ""}
             />
-            <p className="text-[0.8rem] text-slate-500">Formato internacional requerido para notificaciones de WhatsApp.</p>
+            {phoneError ? (
+              <p className="text-[0.8rem] text-red-500 font-medium">{phoneError}</p>
+            ) : (
+              <p className="text-[0.8rem] text-slate-500">
+                Se usará para enviar recordatorios por WhatsApp.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-2">

@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Globe, Palette, Sparkles, Link as LinkIcon } from "lucide-react";
 import { UploadDropzone } from "@/components/uploader/UploadDropzone";
 import { cn } from "@/lib/utils";
+import { validateAndFormatPhone } from "@/lib/phone-utils";
 
 const defaultBranding = {
   companyDisplayName: "",
@@ -72,16 +73,17 @@ export function MicrositeSettings() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const previewUrl = useMemo(() => {
     if (!form.publicSlug) return null;
-    return `https://${form.publicSlug}.${process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") ?? "agend.ar"}/book`;
+    return `https://${form.publicSlug}.${process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") ?? "agend.ar"}`;
   }, [form.publicSlug]);
 
   const fallbackPreview = useMemo(() => {
     if (!form.publicSlug) return null;
-    return `http://localhost:3000/book/${form.publicSlug}`;
+    return `http://localhost:3000/book/${form.publicSlug}`; // Maintain this for local debugging of the namespace, although route rewrite makes root work too.
   }, [form.publicSlug]);
 
   useEffect(() => {
@@ -137,6 +139,22 @@ export function MicrositeSettings() {
       return;
     }
 
+    let finalPhone = form.contactPhone;
+
+    if (form.contactPhone) {
+      const { isValid, formatted, error } = validateAndFormatPhone(form.contactPhone);
+      if (!isValid) {
+        setPhoneError(error || "Número inválido");
+        toast({
+          title: "Teléfono inválido",
+          description: error || "Por favor verificá el número de contacto.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (formatted) finalPhone = formatted;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -152,7 +170,7 @@ export function MicrositeSettings() {
           buttonText: form.buttonText,
           logoUrl: form.logoUrl || null,
           heroImageUrl: form.heroImageUrl || null,
-          contactPhone: form.contactPhone || null,
+          contactPhone: finalPhone || null,
           contactEmail: form.contactEmail || null,
           schedule: form.schedule || null,
         },
@@ -216,7 +234,7 @@ export function MicrositeSettings() {
               placeholder="estetica-bella"
             />
             <p className="text-sm text-slate-500">
-              Tus pacientes accederán a <span className="font-semibold">{previewUrl ?? "tu-subdominio.agend.ar/book"}</span>
+              Tus pacientes accederán a <span className="font-semibold">{previewUrl ?? "tu-subdominio.agend.ar"}</span>
             </p>
             {fallbackPreview ? (
               <p className="text-xs text-slate-400">
@@ -365,9 +383,23 @@ export function MicrositeSettings() {
             <Input
               id="contactPhone"
               value={form.contactPhone}
-              onChange={(event) => updateField("contactPhone", event.target.value)}
+              onChange={(event) => {
+                updateField("contactPhone", event.target.value);
+                if (phoneError) setPhoneError(null);
+              }}
+              onBlur={() => {
+                if (!form.contactPhone) return;
+                const { isValid, formatted, error } = validateAndFormatPhone(form.contactPhone);
+                if (!isValid) {
+                  setPhoneError(error || "Número inválido");
+                } else if (formatted) {
+                  updateField("contactPhone", formatted);
+                }
+              }}
+              className={phoneError ? "border-red-500 ring-red-500" : ""}
               placeholder="+54 9 11 5555-5555"
             />
+            {phoneError && <p className="text-xs text-red-500 font-medium">{phoneError}</p>}
           </div>
           <div className="space-y-3">
             <Label htmlFor="contactEmail">Email de contacto</Label>

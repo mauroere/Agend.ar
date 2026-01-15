@@ -13,6 +13,7 @@ const bodySchema = z.object({
   imageUrl: z.string().url().optional().nullable(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  categoryId: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await db
     .from("agenda_services")
-    .select("id, name, description, duration_minutes, price_minor_units, currency, color, image_url, active, sort_order")
+    .select("id, name, description, duration_minutes, price_minor_units, currency, color, image_url, active, sort_order, category_id")
     .eq("tenant_id", tenantId)
     .order("active", { ascending: false })
     .order("sort_order", { ascending: true })
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder } = parsed.data;
+  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder, categoryId } = parsed.data;
 
   const payload: Database["public"]["Tables"]["agenda_services"]["Insert"] = {
     tenant_id: tenantId,
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
     image_url: imageUrl ?? null,
     active: active ?? true,
     sort_order: sortOrder ?? 0,
+    category_id: categoryId ?? null,
   };
 
   const { error } = await db.from("agenda_services").insert(payload);

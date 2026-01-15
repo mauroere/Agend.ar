@@ -27,6 +27,7 @@ type LocationLookup = Pick<LocationRow, "id" | "name" | "timezone" | "buffer_min
 export type AppointmentCreationInput = {
   patient: string;
   phone: string;
+  email?: string; // Added
   start: string;
   duration?: number;
   serviceName?: string | null;
@@ -45,6 +46,8 @@ export class AppointmentCreationError extends Error {
   }
 }
 
+import { createGoogleCalendarEvent } from "@/server/integrations/google-calendar";
+
 export async function createAppointmentForTenant(options: {
   db: SupabaseClient<Database>;
   tenantId: string;
@@ -52,7 +55,7 @@ export async function createAppointmentForTenant(options: {
   sendNotifications?: boolean;
 }) {
   const { db, tenantId, input, sendNotifications = true } = options;
-  const { patient, phone, start, duration, serviceName, notes, locationId: rawLocationId, serviceId, providerId } = input;
+  const { patient, phone, email, start, duration, serviceName, notes, locationId: rawLocationId, serviceId, providerId } = input;
 
   if (!patient || !phone || !start) {
     throw new AppointmentCreationError("Missing required fields", 400);
@@ -104,6 +107,25 @@ export async function createAppointmentForTenant(options: {
     }
 
     resolvedProvider = providerRow as ProviderLookup;
+  } else {
+    // Audit: Enforce provider assignment.
+    // If no providerId is supplied, try to auto-assign the first available active provider.
+    const { data: anyProvider } = await db
+      .from("agenda_providers")
+      .select("id, tenant_id, full_name, active, default_location_id, metadata")
+      .eq("tenant_id", tenantId)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (anyProvider) {
+      resolvedProvider = anyProvider as ProviderLookup;
+    } else {
+      // If absolutely no providers exist, we might allow it (legacy) or fail.
+      // Based on user request "asignar obligatoriamente", we should likely ensure one exists.
+      // But for now, we'll proceed only if we found one.
+      // throw new AppointmentCreationError("No hay profesionales disponibles para asignar el turno", 400); 
+    }
   }
 
   const durationSource = Number(duration ?? resolvedService?.duration_minutes ?? 30);
@@ -123,6 +145,7 @@ export async function createAppointmentForTenant(options: {
       tenant_id: tenantId,
       full_name: patient,
       phone_e164: normalizedPhone,
+      email: email && email.length > 0 ? email : null, // Added
       opt_out: false,
     } satisfies Database["public"]["Tables"]["agenda_patients"]["Insert"];
 
@@ -138,7 +161,11 @@ export async function createAppointmentForTenant(options: {
 
     patientId = (inserted as Pick<PatientRow, "id">).id;
   } else {
-    await db.from("agenda_patients").update({ full_name: patient }).eq("id", patientId).eq("tenant_id", tenantId);
+    // Upsert email if provided
+    const updatePayload: any = { full_name: patient };
+    if (email && email.length > 0) updatePayload.email = email;
+    
+    await db.from("agenda_patients").update(updatePayload).eq("id", patientId).eq("tenant_id", tenantId);
   }
 
   let locationId: string | null = rawLocationId ?? resolvedProvider?.default_location_id ?? null;
@@ -269,7 +296,7 @@ export async function createAppointmentForTenant(options: {
     end_at: endAt.toISOString(),
     status: "pending",
     service_id: resolvedService?.id ?? null,
-    provider_id: providerId ?? null,
+    provider_id: resolvedProvider?.id ?? null,
     service_name: normalizedServiceName,
     // service_snapshot: serviceSnapshot, // TODO: Run migration to add this column
     internal_notes: notes ?? null,
@@ -282,7 +309,19 @@ export async function createAppointmentForTenant(options: {
     .single();
 
   if (apptError) {
+    if (apptError.code === "23P01" || apptError.message?.includes("agenda_chk_no_overlap")) {
+      throw new AppointmentCreationError("El horario seleccionado ya está ocupado por otro turno (conflicto detectado).", 409);
+    }
     throw new AppointmentCreationError(apptError.message, 400);
+  }
+
+  // Fire & Forget: Sync to Google Calendar
+  if (providerId) {
+     void createGoogleCalendarEvent(db, {
+         ...appt as any, 
+         agenda_patients: { full_name: patient },
+         agenda_services: { name: (resolvedService?.name ?? serviceName ?? "Servicio") }
+     }, providerId).catch(console.error);
   }
 
   if (sendNotifications) {
@@ -302,11 +341,22 @@ export async function createAppointmentForTenant(options: {
       const templateKey = TEMPLATE_NAMES.appointmentCreated;
       const templateToSend = templateMap?.get(templateKey)?.metaTemplateName ?? templateKey;
       
+      const providerName = resolvedProvider?.full_name ?? "el especialista";
+      const dateStr = startAt.toLocaleDateString("es-AR", { day: 'numeric', month: 'long', timeZone: locationTimezone });
+      const timeStr = startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: locationTimezone });
+
+      // Based on real template structure:
+      // {{1}} Patient
+      // {{2}} Date (Body)
+      // {{3}} Date (Label: Fecha)
+      // {{4}} Time (Label: Hora)
+      // {{5}} Location + Provider (Label: Dónde)
       const variablesToSend = [
           patient,
-          startAt.toLocaleDateString("es-AR", { day: 'numeric', month: 'long', timeZone: locationTimezone }),
-          startAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: locationTimezone }),
-          locationName ?? "nuestro consultorio",
+          dateStr,
+          dateStr,
+          timeStr,
+          `${locationName ?? "nuestro consultorio"} con ${providerName}`,
       ];
 
       console.log(`[AppointmentCreation] Sending WhatsApp to ${normalizedPhone} (Template: ${templateToSend})`);
@@ -326,6 +376,13 @@ export async function createAppointmentForTenant(options: {
         direction: "out",
         type: TEMPLATE_NAMES.appointmentCreated,
         status: "sent",
+        // @ts-ignore - The type definition in DB types might not include payload_json yet if not generated
+        // but we want to save it as JSONB
+        payload_json: {
+            template: templateToSend,
+            variables: variablesToSend,
+            type: "template"
+        }
       });
 
       logInfo("appointment.created_notification_sent", {

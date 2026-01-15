@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     tenantSlug,
     patient,
     phone,
+    email,
     start,
     duration,
     service,
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       input: {
         patient,
         phone,
+        email: email ?? null,
         start,
         duration,
         serviceName: service ?? null,
