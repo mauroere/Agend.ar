@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { 
     getWhatsAppIntegrationByPhoneId, 
-    getWhatsAppIntegrationByVerifyToken 
+    getWhatsAppIntegrationByVerifyToken,
+    WhatsAppCredentials
 } from "@/server/whatsapp-config";
 import { processBotMessage } from "@/lib/bot/engine";
 import { serviceClient } from "@/lib/supabase/service";
