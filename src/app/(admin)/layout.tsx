@@ -14,7 +14,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // Si no hay sesión, al login
   if (!session) redirect("/login");
 
-  const db = serviceClient || supabase;
+  // @ts-ignore - Supabase type mismatch between client and service role
+  const db: any = serviceClient || supabase;
 
   // @ts-ignore - is_platform_admin not yet in generated types
   const { data: user } = await db
