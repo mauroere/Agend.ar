@@ -25,6 +25,7 @@ type AppointmentProps = {
   location: { name: string; address: string | null } | null;
 };
 
+// Appointment Card Component
 export function AppointmentCard({ appt, isPast }: { appt: AppointmentProps, isPast?: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
