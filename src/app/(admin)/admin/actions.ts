@@ -32,6 +32,8 @@ export async function updateAdminNote(content: string) {
 }
 
 export async function getAdminNote() {
+    if (!serviceClient) return "";
+
     const { data } = await serviceClient
         .from("admin_dashboard_notes")
         .select("content")
