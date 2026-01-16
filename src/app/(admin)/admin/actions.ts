@@ -9,6 +9,8 @@ export async function updateAdminNote(content: string) {
     // Let's assume we use a singleton pattern or just pick the latest.
     
     // Check if there is a note, if not create one.
+    if (!serviceClient) throw new Error("Service client not configured");
+
     const { data: existing } = await serviceClient
         .from("admin_dashboard_notes")
         .select("id")
