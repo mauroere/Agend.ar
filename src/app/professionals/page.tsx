@@ -32,7 +32,7 @@ export default async function ProfessionalsPage() {
   const { data: locations } = await db
     .from("agenda_locations")
     .select("id, name, timezone, default_duration, buffer_minutes")
-    .eq("tenant_id", tenantId)
+    .eq("tenant_id", tenantId!)
     .order("name", { ascending: true })
     .returns<LocationRow[]>();
 

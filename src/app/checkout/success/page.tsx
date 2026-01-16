@@ -69,7 +69,7 @@ export default function CheckoutSuccessPage({
            <p>ID de pago: <span className="font-mono text-slate-700">{searchParams.payment_id}</span></p>
         </div>
 
-        <Button asChild className="w-full">
+        <Button className="w-full">
           <Link href="/">Volver al inicio</Link>
         </Button>
       </div>

@@ -45,7 +45,7 @@ export default function LoginPage() {
     if (user) {
        // @ts-ignore
        const { data: profile } = await supabase.from("agenda_users").select("is_platform_admin").eq("id", user.id).single();
-       if (profile?.is_platform_admin) {
+       if ((profile as any)?.is_platform_admin) {
            router.push("/admin");
            return;
        }

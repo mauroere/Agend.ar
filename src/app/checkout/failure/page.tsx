@@ -16,7 +16,7 @@ export default function CheckoutFailurePage() {
         <p className="mb-8 text-slate-600">
           No pudimos procesar tu pago. Por favor, intentá nuevamente o contactate con nosotros.
         </p>
-        <Button asChild variant="outline" className="w-full">
+        <Button variant="outline" className="w-full">
           <Link href="/">Volver al inicio</Link>
         </Button>
       </div>

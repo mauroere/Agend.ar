@@ -1055,6 +1055,26 @@
 			],
 			"isBackground": false,
 			"group": "none"
+		},
+		{
+			"label": "Build Project Check",
+			"type": "shell",
+			"command": "npm run build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Type Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "test"
 		}
 	]
 }

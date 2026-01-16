@@ -7,6 +7,7 @@ import {
 import { processBotMessage } from "@/lib/bot/engine";
 import { serviceClient } from "@/lib/supabase/service";
 import { Json } from "@/types/database";
+import { sendTextMessage } from "@/lib/whatsapp";
 
 
 function normalizePhone(phone: string) {
@@ -143,6 +144,9 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get("hub.challenge");
 
   if (mode === "subscribe" && token) {
+     if (!serviceClient) {
+        return new NextResponse("Service Unavailable", { status: 503 });
+     }
      const integration = await getWhatsAppIntegrationByVerifyToken(serviceClient, token);
      if (integration) {
        return new NextResponse(challenge, { status: 200 });
@@ -179,6 +183,11 @@ export async function POST(request: NextRequest) {
     const phoneNumberId = value.metadata?.phone_number_id;
     if (!phoneNumberId) return NextResponse.json({ status: "ignored" });
 
+    if (!serviceClient) {
+       console.error("Service client unavailable in webhook POST");
+       return NextResponse.json({ status: "error" }, { status: 500 });
+    }
+
     const integration = await getWhatsAppIntegrationByPhoneId(serviceClient, phoneNumberId);
     if (!integration) {
         console.warn(`[Webhook] No tenant found for PhoneID ${phoneNumberId}`);
@@ -194,11 +203,11 @@ export async function POST(request: NextRequest) {
            const userName = value.contacts?.[0]?.profile?.name || "Usuario";
            
            await processBotMessage(
-               integration.tenant_id, 
+               integration.tenantId, 
                "+" + from, // Ensure E.164
                text, 
                userName, 
-               integration.credentials_parsed
+               integration.credentials
            );
        }
     }

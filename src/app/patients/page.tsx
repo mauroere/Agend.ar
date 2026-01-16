@@ -21,7 +21,7 @@ export default async function PatientsPage() {
   const [{ data: patients }, { data: upcoming }] = await Promise.all([
     db
       .from("agenda_patients")
-      .select("id, full_name, phone_e164, opt_out, notes")
+      .select("id, full_name, phone_e164, email, opt_out, notes")
       .eq("tenant_id", tenantId)
       .order("full_name", { ascending: true })
       .returns<PatientRow[]>(),
@@ -53,6 +53,7 @@ export default async function PatientsPage() {
     id: p.id,
     fullName: p.full_name,
     phone: p.phone_e164,
+    email: p.email ?? null,
     nextAppointment: nextByPatient.get(p.id) ?? null,
     noShowCount: 0,
     optOut: p.opt_out,

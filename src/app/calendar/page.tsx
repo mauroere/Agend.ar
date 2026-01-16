@@ -73,7 +73,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     };
 
     const payload: Database["public"]["Tables"]["agenda_locations"]["Insert"] = {
-      tenant_id: tenantId,
+      tenant_id: tenantId as string,
       name: "Consultorio Principal",
       timezone: "America/Argentina/Buenos_Aires",
       business_hours: fallbackBusinessHours,
@@ -120,9 +120,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: { l
     id: appt.id,
     start: new Date(appt.start_at),
     durationMinutes: toMinutes(appt.start_at, appt.end_at),
-    patient: appt.agenda_patients?.full_name ?? "Paciente",
+    patient: (appt.agenda_patients as any)?.full_name ?? "Paciente",
     status: asAppointmentStatus(appt.status),
-    phone: appt.agenda_patients?.phone_e164 ?? "",
+    phone: (appt.agenda_patients as any)?.phone_e164 ?? "",
     locationId: appt.location_id ?? undefined,
     serviceId: appt.service_id ?? undefined,
     providerId: appt.provider_id ?? undefined,

@@ -5,6 +5,8 @@ import { WaitlistTable } from "@/components/waitlist/WaitlistTable";
 import { LocationSwitcher } from "@/components/location/LocationSwitcher";
 import { Database } from "@/types/database";
 import { requireTenantSession } from "@/server/auth";
+import { serviceClient } from "@/lib/supabase/service";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 type WaitlistRow = Database["public"]["Tables"]["agenda_waitlist"]["Row"] & {
   agenda_patients: Pick<Database["public"]["Tables"]["agenda_patients"]["Row"], "full_name" | "phone_e164" | "opt_out"> | null;
@@ -13,21 +15,23 @@ type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"],
 
 export default async function WaitlistPage({ searchParams }: { searchParams: { location?: string } }) {
   const { supabase, tenantId } = await requireTenantSession();
-  const { data: locationRows } = await supabase
+  const db = (serviceClient ?? supabase) as SupabaseClient<Database>;
+
+  const { data: locationRows } = await db
     .from("agenda_locations")
     .select("id, name")
-    .eq("tenant_id", tenantId)
+    .eq("tenant_id", tenantId!)
     .order("name", { ascending: true });
 
   const locations = (locationRows as LocationRow[] | null) ?? [];
   const activeLocationId = searchParams.location && locations.some((l) => l.id === searchParams.location)
     ? searchParams.location
     : locations[0]?.id;
-  const { data } = await supabase
+  const { data } = await db
     .from("agenda_waitlist")
     .select("id, tenant_id, location_id, patient_id, priority, active, agenda_patients:patient_id(full_name, phone_e164, opt_out)")
-    .eq("tenant_id", tenantId)
-    .eq("location_id", activeLocationId ?? undefined)
+    .eq("tenant_id", tenantId!)
+    .eq("location_id", activeLocationId ?? null)
     .eq("active", true)
     .order("priority", { ascending: true })
     .returns<WaitlistRow[]>();

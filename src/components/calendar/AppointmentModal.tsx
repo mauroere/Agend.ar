@@ -91,9 +91,10 @@ type AppointmentModalProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   appointment?: AppointmentData;
+  defaultDate?: Date;
 };
 
-export function AppointmentModal({ locations, services, providers, open: controlledOpen, onOpenChange, appointment }: AppointmentModalProps) {
+export function AppointmentModal({ locations, services, providers, open: controlledOpen, onOpenChange, appointment, defaultDate }: AppointmentModalProps) {
 	const isControlled = controlledOpen !== undefined;
 	const [internalOpen, setInternalOpen] = useState(controlledOpen ?? false);
 	const open = isControlled ? controlledOpen : internalOpen;
@@ -103,7 +104,7 @@ export function AppointmentModal({ locations, services, providers, open: control
 		onOpenChange?.(value);
 	};
 
-	const [form, setForm] = useState<FormValues>({ ...INITIAL_FORM, date: new Date() });
+	const [form, setForm] = useState<FormValues>({ ...INITIAL_FORM, date: defaultDate ?? new Date() });
 	const [locationId, setLocationId] = useState<string>(locations[0]?.id ?? "");
 
   // Auto-select first provider if none selected

@@ -163,6 +163,12 @@ export function CalendarPageClient({ appointments, locations, services, provider
 					}}
 					appointmentId={appointmentToAttend.id}
 					patientName={appointmentToAttend.patient}
+					serviceName={appointmentToAttend.service ?? "Consulta"}
+					onSuccess={() => {
+						setAttendOpen(false);
+						setAppointmentToAttend(null);
+						router.refresh();
+					}}
 				/>
 			)}
 		</>

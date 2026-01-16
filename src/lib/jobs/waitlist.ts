@@ -23,9 +23,12 @@ export async function runWaitlistJob() {
   const templateCache = new Map<string, Awaited<ReturnType<typeof getTenantTemplateMap>>>();
   const templateKey = TEMPLATE_NAMES.waitlistOffer;
 
-  for (const appt of canceled ?? []) {
-    const timeZone = (appt as any).agenda_locations?.timezone ?? "America/Argentina/Buenos_Aires";
-    const _locationName = (appt as any).agenda_locations?.name ?? "";
+  // Cast canceled to any[] or specific type to avoid "never" inference
+  const safeCanceled = (canceled ?? []) as any[];
+
+  for (const appt of safeCanceled) {
+    const timeZone = appt.agenda_locations?.timezone ?? "America/Argentina/Buenos_Aires";
+    const _locationName = appt.agenda_locations?.name ?? "";
 
     const [credentials, templates] = await Promise.all([
       (async () => {
