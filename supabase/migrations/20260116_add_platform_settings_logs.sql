@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS "public"."platform_logs" (
 
 -- Enable RLS
 ALTER TABLE "public"."platform_settings" ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE "public"."platform_logs" ENABLE ROW LEVEL SECURITY;
 
 -- Seed default settings
