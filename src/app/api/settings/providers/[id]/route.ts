@@ -24,8 +24,22 @@ const schema = z.object({
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
   const providerId = params.id;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage providers" },
+      { status: 403 }
+    );
+  }
 
   if (!providerId) {
     return NextResponse.json({ error: "Falta ID" }, { status: 400 });
@@ -115,8 +129,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
   const providerId = params.id;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage providers" },
+      { status: 403 }
+    );
+  }
 
   if (!providerId) {
     return NextResponse.json({ error: "Falta ID" }, { status: 400 });

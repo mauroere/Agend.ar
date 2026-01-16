@@ -422,8 +422,8 @@ export function WhatsAppTemplatesSettings() {
                                 <p className="font-semibold mb-1">¡Consejo para evitar rechazos!</p>
                                 <ul className="list-disc pl-4 space-y-1 text-xs">
                                     <li>Meta rechazará plantillas con muy poco texto.</li>
-                                    <li><strong>Mal:</strong> "Hola {"{{1}}"}, turno el {"{{2}}"}"</li>
-                                    <li><strong>Bien:</strong> "Hola {"{{1}}"}, confirmamos tu cita para el día {"{{2}}"}. Si necesitas cancelar, avísanos."</li>
+                                    <li><strong>Mal:</strong> &quot;Hola {"{{1}}"}, turno el {"{{2}}"}&quot;</li>
+                                    <li><strong>Bien:</strong> &quot;Hola {"{{1}}"}, confirmamos tu cita para el día {"{{2}}"}. Si necesitas cancelar, avísanos.&quot;</li>
                                 </ul>
                             </div>
                             <Textarea  

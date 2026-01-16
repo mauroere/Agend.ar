@@ -65,6 +65,11 @@ export async function getRouteTenantContext(request: NextRequest): Promise<Tenan
   }
 
   if (headerInfo.internalId && tenantId && headerInfo.internalId !== tenantId && !headerInfo.isDevBypass) {
+    // GOD MODE: If user is platform admin, allow access to any tenant
+    if (isPlatformAdmin) {
+        return { supabase, db, tenantId: headerInfo.internalId, session, isPlatformAdmin: true };
+    }
+    
     return { error: NextResponse.json({ error: "Tenant mismatch" }, { status: 403 }) };
   }
 

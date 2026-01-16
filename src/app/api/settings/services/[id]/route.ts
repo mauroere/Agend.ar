@@ -14,13 +14,29 @@ const bodySchema = z.object({
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   categoryId: z.string().uuid().optional().nullable(),
+  prepaymentStrategy: z.enum(["none", "full", "fixed"]).optional().nullable(),
+  prepaymentAmount: z.number().nonnegative().optional().nullable(),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
   const serviceId = params.id;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage services" },
+      { status: 403 }
+    );
+  }
 
   if (!serviceId) {
     return NextResponse.json({ error: "Falta ID" }, { status: 400 });
@@ -33,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const updates: Database["public"]["Tables"]["agenda_services"]["Update"] = {};
-  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder, categoryId } = parsed.data;
+  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder, categoryId, prepaymentStrategy, prepaymentAmount } = parsed.data;
 
   if (typeof name === "string") updates.name = name;
   if (description !== undefined) updates.description = description;
@@ -45,6 +61,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (typeof active === "boolean") updates.active = active;
   if (typeof sortOrder === "number") updates.sort_order = sortOrder;
   if (categoryId !== undefined) updates.category_id = categoryId;
+  if (prepaymentStrategy !== undefined) updates.prepayment_strategy = prepaymentStrategy;
+  if (prepaymentAmount !== undefined) updates.prepayment_amount = prepaymentAmount === null ? null : Math.round(prepaymentAmount * 100);
 
   const { error } = await db
     .from("agenda_services")
@@ -62,7 +80,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage services" },
+      { status: 403 }
+    );
+  }
 
   const serviceId = params.id;
   if (!serviceId) {

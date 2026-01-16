@@ -25,6 +25,7 @@ const defaultBranding = {
   contactPhone: "",
   contactEmail: "",
   schedule: "",
+  pageTitle: "",
 };
 
 const palettePresets = [
@@ -109,6 +110,7 @@ export function MicrositeSettings() {
           contactPhone: tenant?.metadata?.contactPhone ?? "",
           contactEmail: tenant?.metadata?.contactEmail ?? "",
           schedule: tenant?.metadata?.schedule ?? "",
+          pageTitle: tenant?.metadata?.pageTitle ?? "",
         }));
       } catch (error) {
         console.error(error);
@@ -173,6 +175,7 @@ export function MicrositeSettings() {
           contactPhone: finalPhone || null,
           contactEmail: form.contactEmail || null,
           schedule: form.schedule || null,
+          pageTitle: form.pageTitle || form.companyDisplayName || form.heroTitle || "Agend.ar", // Default fallback logic
         },
       };
 
@@ -341,7 +344,19 @@ export function MicrositeSettings() {
             />
           </div>
           <div className="space-y-3">
-            <Label htmlFor="heroTitle">Título principal</Label>
+            <Label htmlFor="pageTitle">Título de la pestaña / página</Label>
+             <Input
+              id="pageTitle"
+              value={form.pageTitle}
+              onChange={(event) => updateField("pageTitle", event.target.value)}
+              placeholder={form.companyDisplayName || "Título que se verá en el navegador"}
+            />
+             <p className="text-[10px] text-slate-500">
+                Se usará en la pestaña del navegador y como título principal SEO. Si lo dejás vacío, usaremos el nombre de la empresa.
+            </p>
+          </div>
+          <div className="space-y-3">
+            <Label htmlFor="heroTitle">Título principal (H1)</Label>
             <Input
               id="heroTitle"
               value={form.heroTitle}

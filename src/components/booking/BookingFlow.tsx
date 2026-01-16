@@ -21,6 +21,8 @@ export type BookingService = {
   color: string | null;
   image_url: string | null;
   category_id?: string | null;
+  prepayment_strategy?: "none" | "full" | "fixed" | null;
+  prepayment_amount?: number | null;
 };
 
 export type BookingProvider = {
@@ -295,6 +297,44 @@ export function BookingFlow({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error ?? "No pudimos reservar el turno");
+      }
+
+      // Check Prepayment
+      if (data.appointment?.status === "awaiting_payment") {
+         const needsFixed = selectedService.prepayment_strategy === "fixed";
+         const amount = needsFixed 
+            ? (selectedService.prepayment_amount ? selectedService.prepayment_amount / 100 : 0)
+            : (selectedService.price_minor_units ? selectedService.price_minor_units / 100 : 0);
+
+         if (amount > 0) {
+            try {
+               const checkoutRes = await fetch("/api/checkout/mercadopago", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                     tenantId: tenantId, 
+                     serviceId: selectedService.id,
+                     serviceName: `Reserva: ${selectedService.name}`,
+                     priceAmount: amount,
+                     patientName: patientName,
+                     patientEmail: patientEmail,
+                     appointmentId: data.appointment.id
+                  })
+               });
+               
+               const checkoutData = await checkoutRes.json();
+               if (!checkoutRes.ok) throw new Error(checkoutData.error ?? "Error al iniciar pago");
+               
+               if (checkoutData.initPoint) {
+                  window.location.href = checkoutData.initPoint;
+                  return;
+               }
+            } catch (payErr) {
+               console.error(payErr);
+               setError("El turno se reservó, pero hubo un error al iniciar el pago. Contactanos para completarlo.");
+               // Fallback: mostrar éxito parcial o error
+            }
+         }
       }
 
       const firstName = patientName.split(" ")[0] ?? "";
@@ -958,10 +998,15 @@ export function BookingFlow({
                              </div>
                           </div>
                       ) : (
-                        <p className="text-xs text-slate-500 ml-1">
-                            Te crearemos una cuenta para que puedas ver y gestionar tus turnos. 
-                            <span className="text-slate-400 block sm:inline"> Te enviaremos el acceso por mail.</span>
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-xs text-slate-500 ml-1">
+                              Te crearemos una cuenta para que puedas ver y gestionar tus turnos. 
+                              <span className="text-slate-400 block sm:inline"> Te enviaremos el acceso por mail.</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 italic ml-1">
+                            * Política de cancelación: Se requiere aviso previo de 24hs para cambios o cancelaciones.
+                          </p>
+                        </div>
                       )}
                   </div>
 

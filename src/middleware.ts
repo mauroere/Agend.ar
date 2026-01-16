@@ -6,11 +6,25 @@ import { findTenantByPublicIdentifier } from "@/server/tenant-routing";
 const PUBLIC_PATH_PREFIXES = [
   "/login",
   "/register",
+  "/admin/login",
   "/api/auth/register",
   "/api/webhooks/whatsapp",
   "/api/repair",
   "/book",
   "/api/public",
+  "/api/checkout",
+];
+
+const PROTECTED_PAGE_PREFIXES = [
+  "/admin",
+  "/analytics",
+  "/calendar",
+  "/patients",
+  "/professionals",
+  "/profile",
+  "/settings",
+  "/today",
+  "/waitlist"
 ];
 
 const DEV_TENANT_SLUG = process.env.NEXT_PUBLIC_DEV_TENANT_SLUG ?? "tenant_1";
@@ -86,13 +100,25 @@ export async function middleware(req: NextRequest) {
   }
 
   const isPublic = isPublicPath(pathname);
+  const isProtectedPage = PROTECTED_PAGE_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  const isApi = pathname.startsWith("/api");
 
   // 3. Auth Check
+  // We allow access if:
+  // - It is explicitly public
+  // - User has a session
+  // - It is NOT an API route AND it is NOT a Protected Page (This allows dynamic tenant slugs)
   if (!isPublic && !session) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+    if (isApi || isProtectedPage) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", pathname);
+      // For API, ideally we return 401, but redirect has been the default behavior.
+      // We keep redirect for pages, but for API hitting this block means it's a private API call without auth.
+      return NextResponse.redirect(url);
+    }
+    // If we are here, it's a page route (not API) that is NOT protected. 
+    // This allows access to /[tenantId] and other pages not in the blocklist.
   }
 
   // 4. Inject headers

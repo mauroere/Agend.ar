@@ -31,7 +31,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage categories" },
+      { status: 403 }
+    );
+  }
 
   const json = await request.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);

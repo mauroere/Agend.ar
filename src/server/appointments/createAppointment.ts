@@ -17,7 +17,7 @@ type ProviderRow = Database["public"]["Tables"]["agenda_providers"]["Row"];
 
 type ServiceLookup = Pick<
   ServiceRow,
-  "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "active"
+  "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "active" | "prepayment_strategy" | "prepayment_amount"
 >;
 
 type ProviderLookup = Pick<ProviderRow, "id" | "tenant_id" | "full_name" | "active" | "default_location_id" | "metadata">;
@@ -73,7 +73,7 @@ export async function createAppointmentForTenant(options: {
   if (serviceId) {
     const { data: serviceRow, error: serviceError } = await db
       .from("agenda_services")
-      .select("id, tenant_id, name, description, duration_minutes, price_minor_units, currency, color, active")
+      .select("id, tenant_id, name, description, duration_minutes, price_minor_units, currency, color, active, prepayment_strategy, prepayment_amount")
       .eq("tenant_id", tenantId)
       .eq("id", serviceId)
       .maybeSingle();
@@ -288,13 +288,16 @@ export async function createAppointmentForTenant(options: {
 
   const normalizedServiceName = resolvedService?.name ?? (serviceName?.trim().length ? serviceName?.trim() : null);
 
+  const needsPrepayment = resolvedService?.prepayment_strategy === "full" || resolvedService?.prepayment_strategy === "fixed";
+  const initialStatus = needsPrepayment ? "awaiting_payment" : "pending";
+
   const appointmentInsert = {
     tenant_id: tenantId,
     location_id: locationId,
     patient_id: patientId,
     start_at: startAt.toISOString(),
     end_at: endAt.toISOString(),
-    status: "pending",
+    status: initialStatus,
     service_id: resolvedService?.id ?? null,
     provider_id: resolvedProvider?.id ?? null,
     service_name: normalizedServiceName,

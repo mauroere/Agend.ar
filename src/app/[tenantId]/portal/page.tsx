@@ -28,7 +28,7 @@ export default async function PortalDashboard({ params }: { params: { tenantId: 
     .from("agenda_patients")
     .select("id, full_name, phone_e164")
     .eq("tenant_id", params.tenantId)
-    .eq("email", userEmail)
+    .eq("email", userEmail!)
     .limit(1)
     .maybeSingle();
 
@@ -68,7 +68,8 @@ export default async function PortalDashboard({ params }: { params: { tenantId: 
         location:agenda_locations(name, address)
     `)
     .eq("patient_id", patient.id)
-    .order("start_at", { ascending: false });
+    .order("start_at", { ascending: false })
+    .returns<any[]>();
 
   const now = new Date();
   const upcoming = (appointments ?? []).filter(a => new Date(a.start_at) >= now && a.status !== 'canceled');

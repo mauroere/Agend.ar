@@ -3,7 +3,8 @@ import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings
 import { MicrositeSettings } from "@/components/settings/MicrositeSettings";
 import { LocationsSettings } from "@/components/settings/LocationsSettings";
 import { MessageLogsSettings } from "@/components/settings/MessageLogsSettings";
-import { WhatsAppTemplatesSettings } from "@/components/settings/WhatsAppTemplatesSettings"; // Added import
+import { WhatsAppTemplatesSettings } from "@/components/settings/WhatsAppTemplatesSettings";
+import { PaymentsSettings } from "@/components/settings/PaymentsSettings";
 import { requireTenantSession } from "@/server/auth";
 
 export default async function SettingsPage() {
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
         <MicrositeSettings />
         <LocationsSettings />
         <IntegrationsSettings />
+        <PaymentsSettings />
         <WhatsAppTemplatesSettings />
         <MessageLogsSettings />
       </div>

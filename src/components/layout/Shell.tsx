@@ -15,6 +15,7 @@ const NAV = [
   { href: "/calendar", label: "Agenda" },
   { href: "/today", label: "Turnos" },
   { href: "/patients", label: "Pacientes" },
+  { href: "/analytics", label: "Reportes" },
   { href: "/professionals", label: "Profesionales" },
   { href: "/settings", label: "Dashboard" },
   { href: "/profile", label: "Mi Perfil" },
@@ -51,10 +52,12 @@ export function Shell({ children, hideNav = false }: { children: ReactNode; hide
   }, []);
 
   const visibleNav = NAV.filter(item => {
-      // Hide Dashboard/Settings for staff, OR if profile is not yet loaded (security/UX)
-      if (item.href === "/settings") {
-         if (!profile) return false; // Loading -> Hide
-         if (profile.role === "staff") return false; // Staff -> Hide
+      // Hide Dashboard, Settings, Analytics, Professionals for staff
+      const staffRestricted = ["/settings", "/analytics", "/professionals"];
+      
+      if (staffRestricted.includes(item.href)) {
+         if (!profile) return false;
+         if (profile.role === "staff") return false;
       }
 
       // Hide Profile for owner, OR if profile is not yet loaded

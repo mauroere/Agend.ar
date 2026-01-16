@@ -53,6 +53,8 @@ type ServicesRow = {
   active: boolean;
   sort_order: number;
   category_id?: string | null; // Added
+  prepayment_strategy?: "none" | "full" | "fixed" | null; // Added
+  prepayment_amount?: number | null; // Added
   created_at: string;
   updated_at: string;
 };
@@ -70,6 +72,8 @@ type ServicesInsert = {
   active?: boolean;
   sort_order?: number;
   category_id?: string | null; // Added
+  prepayment_strategy?: "none" | "full" | "fixed" | null; // Added
+  prepayment_amount?: number | null; // Added
   created_at?: string;
   updated_at?: string;
 };
@@ -241,6 +245,9 @@ type TenantsRow = {
   public_slug: string | null;
   custom_domain: string | null;
   public_metadata: Json;
+  status?: string; // e.g. 'active', 'suspended'
+  plan?: string;   // e.g. 'free', 'pro'
+  subscription_amount?: number;
 };
 
 type TenantsInsert = {
@@ -250,6 +257,9 @@ type TenantsInsert = {
   public_slug?: string | null;
   custom_domain?: string | null;
   public_metadata?: Json;
+  status?: string;
+  plan?: string;
+  subscription_amount?: number;
 };
 
 type TenantsUpdate = Partial<TenantsRow>;
@@ -455,6 +465,27 @@ export interface Database {
         Row: MedicalRecordsRow;
         Insert: MedicalRecordsInsert;
         Update: MedicalRecordsUpdate;
+        Relationships: [];
+      };
+      admin_dashboard_notes: {
+        Row: {
+          id: string;
+          content: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          content: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          content?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
         Relationships: [];
       };
       agenda_medical_attachments: {

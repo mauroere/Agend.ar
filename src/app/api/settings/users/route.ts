@@ -44,10 +44,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { tenantId } = context;
+  const { tenantId, db, session } = context;
 
-  // Check if current user is owner (optional, but good practice)
-  // For now, we assume any staff can invite or we skip this check to speed up.
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can invite users" },
+      { status: 403 }
+    );
+  }
 
   const body = await request.json();
   const { email, role } = body;

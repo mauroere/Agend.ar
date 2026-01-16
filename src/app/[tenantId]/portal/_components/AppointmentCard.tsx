@@ -7,16 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Clock, AlertTriangle, Loader2 } from "lucide-react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 
 type AppointmentProps = {
@@ -27,10 +25,17 @@ type AppointmentProps = {
   location: { name: string; address: string | null } | null;
 };
 
-export function AppointmentCard({ appt }: { appt: AppointmentProps }) {
+export function AppointmentCard({ appt, isPast }: { appt: AppointmentProps, isPast?: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+
+  // Check 24h Policy
+  const now = new Date();
+  const startAt = new Date(appt.start_at);
+  const diffInHours = (startAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+  const isWithin24Hours = diffInHours < 24;
+  const isCanceled = appt.status === 'canceled';
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("es-AR", { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
@@ -51,18 +56,46 @@ export function AppointmentCard({ appt }: { appt: AppointmentProps }) {
     setLoading(true);
     try {
         const res = await fetch(`/api/portal/appointments/${appt.id}/cancel`, { method: "POST" });
-        if (!res.ok) throw new Error("Error al cancelar");
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || "Error al cancelar");
         
         toast({ title: "Turno cancelado", description: "El turno ha sido cancelado correctamente." });
         router.refresh();
     } catch (e) {
-        toast({ title: "Error", description: "No se pudo cancelar el turno.", variant: "destructive" });
+        toast({ 
+            title: "No se pudo cancelar", 
+            description: e instanceof Error ? e.message : "Intente nuevamente más tarde.", 
+            variant: "destructive" 
+        });
     } finally {
         setLoading(false);
     }
   };
 
-  const isCancelable = appt.status !== 'canceled' && appt.status !== 'completed' && appt.status !== 'no_show';
+  const handleReschedule = async () => {
+     // Logic: Cancel first, then redirect to booking
+     setLoading(true);
+    try {
+        const res = await fetch(`/api/portal/appointments/${appt.id}/cancel`, { method: "POST" });
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || "Error al procesar la reprogramación");
+        
+        toast({ title: "Turno anterior cancelado", description: "Seleccioná tu nuevo horario." });
+        // Redirect to booking page (root of tenant)
+        router.push(`../`); 
+    } catch (e) {
+        toast({ 
+            title: "Error", 
+            description: e instanceof Error ? e.message : "No se pudo iniciar la reprogramación.", 
+            variant: "destructive" 
+        });
+        setLoading(false);
+    }
+  };
+
+  const isCancelable = !isPast && !isCanceled && appt.status !== 'completed' && appt.status !== 'no_show' && !isWithin24Hours;
 
   return (
       <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-md transition-all hover:shadow-lg">
@@ -86,32 +119,73 @@ export function AppointmentCard({ appt }: { appt: AppointmentProps }) {
                  </div>
              </div>
 
-             {isCancelable && (
-                 <div className="mt-4 flex justify-end">
-                     <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" disabled={loading}>
-                                {loading && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                                Cancelar Turno
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Esta acción cancelará tu turno para el {formatDate(appt.start_at)}.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Volver</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleCancel} className="bg-red-600 hover:bg-red-700">
-                                    Sí, cancelar
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                     </AlertDialog>
+             {/* Policy Warning */}
+             {!isPast && !isCanceled && isWithin24Hours && (
+                 <div className="mt-4 p-3 bg-red-50 text-red-800 text-sm rounded-lg flex items-start gap-2 border border-red-100">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <p>
+                        Ya no es posible cancelar ni reprogramar este turno (Política de 24hs). 
+                        Contactate con el consultorio si es una urgencia.
+                    </p>
                  </div>
              )}
+
+             <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-100/50">
+                 {isCancelable ? (
+                     <>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" className="text-slate-500 hover:text-red-600 hover:bg-red-50" disabled={loading}>
+                                    Cancelar turno
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>¿Cancelar Turno?</DialogTitle>
+                                    <DialogDescription>
+                                        Esta acción liberará tu horario. Si pagaste seña, consultá las condiciones de reembolso.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <Button variant="destructive" onClick={handleCancel} disabled={loading}>
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirmar cancelación"}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" disabled={loading}>
+                                    Reprogramar
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>¿Reprogramar Turno?</DialogTitle>
+                                    <DialogDescription>
+                                        Para cambiar el horario, primero debemos cancelar tu turno actual. Luego te llevaremos a la agenda para que elijas uno nuevo.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <Button onClick={handleReschedule} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700">
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sí, reprogramar"}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                     </>
+                 ) : (
+                    <>
+                        {/* If cancelled or past, maybe show nothing or Receipt button */}
+                        {!isCanceled && !isPast && (
+                             <Button variant="ghost" disabled className="text-slate-400">
+                                No modificable
+                            </Button>
+                        )}
+                    </>
+                 )}
+             </div>
           </CardContent>
       </Card>
   );

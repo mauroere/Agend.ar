@@ -15,7 +15,21 @@ export async function PATCH(
 ) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage categories" },
+      { status: 403 }
+    );
+  }
 
   const json = await request.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);
@@ -51,11 +65,24 @@ export async function DELETE(
 ) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can manage categories" },
+      { status: 403 }
+    );
+  }
 
   // First check if used? FK constraint `on delete set null` handles "not breaking", 
   // but maybe we want to warn? For now let's just delete (services become uncategorized).
-  
   const { error } = await db
     .from("agenda_service_categories")
     .delete()

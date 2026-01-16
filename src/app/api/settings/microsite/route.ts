@@ -17,6 +17,7 @@ const metadataSchema = z.object({
   contactEmail: z.string().email().optional().nullable(),
   schedule: z.string().trim().max(200).optional().nullable(),
   companyDisplayName: z.string().trim().max(100).optional().nullable(),
+  pageTitle: z.string().trim().max(100).optional().nullable(),
 });
 
 const RESERVED_SLUGS = [

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   // Since 'db' is likely the service role client (via tenant-context), this bypasses RLS.
   const { data: tenants, error } = await db
     .from("agenda_tenants")
-    .select("id, name, created_at")
+    .select("id, name, created_at, public_slug, status")
     .order("created_at", { ascending: false });
 
   if (error) {

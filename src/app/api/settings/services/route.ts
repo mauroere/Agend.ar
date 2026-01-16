@@ -14,6 +14,8 @@ const bodySchema = z.object({
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   categoryId: z.string().uuid().optional().nullable(),
+  prepaymentStrategy: z.enum(["none", "full", "fixed"]).optional().nullable(),
+  prepaymentAmount: z.number().nonnegative().optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await db
     .from("agenda_services")
-    .select("id, name, description, duration_minutes, price_minor_units, currency, color, image_url, active, sort_order, category_id")
+    .select("id, name, description, duration_minutes, price_minor_units, currency, color, image_url, active, sort_order, category_id, prepayment_strategy, prepayment_amount")
     .eq("tenant_id", tenantId)
     .order("active", { ascending: false })
     .order("sort_order", { ascending: true })
@@ -39,7 +41,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const context = await getRouteTenantContext(request);
   if ("error" in context) return context.error;
-  const { db, tenantId } = context;
+  const { db, tenantId, session } = context;
+
+  // Check Permissions
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners can create services" },
+      { status: 403 }
+    );
+  }
 
   const json = await request.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);
@@ -47,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder, categoryId } = parsed.data;
+  const { name, description, durationMinutes, price, currency, color, imageUrl, active, sortOrder, categoryId, prepaymentStrategy, prepaymentAmount } = parsed.data;
 
   const payload: Database["public"]["Tables"]["agenda_services"]["Insert"] = {
     tenant_id: tenantId,
@@ -61,6 +77,8 @@ export async function POST(request: NextRequest) {
     active: active ?? true,
     sort_order: sortOrder ?? 0,
     category_id: categoryId ?? null,
+    prepayment_strategy: prepaymentStrategy ?? "none",
+    prepayment_amount: typeof prepaymentAmount === "number" ? Math.round(prepaymentAmount * 100) : null,
   };
 
   const { error } = await db.from("agenda_services").insert(payload);

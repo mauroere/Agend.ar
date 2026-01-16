@@ -6,11 +6,13 @@ import { Database } from "@/types/database";
 import { BookingFlow, BookingLocation, BookingProvider, BookingService, BookingCategory } from "@/components/booking/BookingFlow";
 import { getTenantHeaderInfo } from "@/server/tenant-headers";
 import { findTenantByPublicIdentifier } from "@/server/tenant-routing";
+import { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 type TenantMetadata = {
   companyDisplayName?: string | null;
+  pageTitle?: string | null;
   heroTitle?: string | null;
   heroSubtitle?: string | null;
   heroTagline?: string | null;
@@ -26,7 +28,7 @@ type TenantMetadata = {
 
 type ServiceRow = Pick<
   Database["public"]["Tables"]["agenda_services"]["Row"],
-  "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "image_url" | "active" | "sort_order" | "category_id"
+  "id" | "name" | "description" | "duration_minutes" | "price_minor_units" | "currency" | "color" | "image_url" | "active" | "sort_order" | "category_id" | "prepayment_strategy" | "prepayment_amount"
 >;
 
 type CategoryRow = Pick<
@@ -40,6 +42,93 @@ type ProviderRow = Pick<
 >;
 
 type LocationRow = Pick<Database["public"]["Tables"]["agenda_locations"]["Row"], "id" | "name" | "address">;
+
+export async function generateMetadata({ params }: { params: { tenantId?: string } }): Promise<Metadata> {
+  const headerBag = headers();
+  const headerInfo = getTenantHeaderInfo(headerBag);
+  const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+
+  let customDomain = null;
+  if (
+    headerInfo.host &&
+    !headerInfo.host.includes("localhost") &&
+    !headerInfo.host.includes("agend.ar") &&
+    !headerInfo.host.includes("vercel.app")
+  ) {
+    customDomain = headerInfo.host;
+  }
+
+  const slugOrId = params.tenantId;
+  const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId || "");
+
+  const tenant = await findTenantByPublicIdentifier({
+    id: (!customDomain && looksLikeUuid) ? slugOrId : null,
+    slug: (!customDomain && !looksLikeUuid) ? slugOrId : null,
+    domain: customDomain
+  });
+
+  if (!tenant) {
+    return {
+      title: "Agend.ar - Reserva tu turno",
+    };
+  }
+
+  const metadata = (tenant.public_metadata || {}) as TenantMetadata;
+  const companyName = metadata.companyDisplayName || tenant.name;
+  
+  // Prioridad: 1. pageTitle (específico para SEO/Tab), 2. companyDisplayName, 3. heroTitle, 4. fallback
+  const title = metadata.pageTitle || companyName || "Reserva de Turnos";
+  const description = metadata.heroSubtitle || `Reserva tu turno en ${companyName} de manera rápida y online.`;
+  
+  const domain = customDomain 
+    ? customDomain 
+    : (tenant.public_slug ? `${tenant.public_slug}.${process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") ?? "agend.ar"}` : "agend.ar");
+  const baseUrl = `${protocol}://${domain}`;
+
+  const images = [];
+  if (metadata.heroImageUrl) images.push({ url: metadata.heroImageUrl, alt: companyName });
+  if (metadata.logoUrl) images.push({ url: metadata.logoUrl, alt: `${companyName} Logo` });
+
+  return {
+    title: {
+      default: title,
+      template: `%s | ${companyName}`,
+    },
+    description: description,
+    metadataBase: new URL(baseUrl),
+    alternates: {
+      canonical: "/",
+    },
+    applicationName: companyName,
+    openGraph: {
+      title: title,
+      description: description,
+      url: "/",
+      siteName: companyName,
+      locale: "es_AR",
+      type: "website",
+      images: images.length > 0 ? images : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: title,
+      description: description,
+      images: images.length > 0 ? images : undefined,
+    },
+    icons: metadata.logoUrl ? {
+      icon: metadata.logoUrl,
+      apple: metadata.logoUrl
+    } : undefined,
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+      }
+    }
+  };
+}
 
 export default async function BookingPage({ params }: { params: { tenantId?: string } }) {
   if (!serviceClient) {
@@ -75,7 +164,7 @@ export default async function BookingPage({ params }: { params: { tenantId?: str
     db
       .from("agenda_services")
       .select(
-        "id, name, description, duration_minutes, price_minor_units, currency, color, image_url, active, sort_order, category_id"
+        "id, name, description, duration_minutes, price_minor_units, currency, color, image_url, active, sort_order, category_id, prepayment_strategy, prepayment_amount"
       )
       .eq("tenant_id", tenantId)
       .order("active", { ascending: false })
@@ -116,6 +205,8 @@ export default async function BookingPage({ params }: { params: { tenantId?: str
       color: service.color,
       image_url: service.image_url,
       category_id: service.category_id,
+      prepayment_strategy: service.prepayment_strategy,
+      prepayment_amount: service.prepayment_amount,
     }));
 
   const categories: BookingCategory[] = (categoriesRes.data ?? []).map((cat) => ({
@@ -164,8 +255,29 @@ export default async function BookingPage({ params }: { params: { tenantId?: str
     : null;
   const accentSurfaceStyle = accentGradient ? { backgroundImage: accentGradient } : { backgroundColor: accentColor };
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfessionalService",
+    "name": companyDisplayName || tenantRecord.name,
+    "image": logoUrl ? [logoUrl] : [],
+    "description": heroSubtitle,
+    "telephone": contactPhone,
+    "email": branding.contactEmail,
+    "url": `https://${tenantRecord.public_slug}.agend.ar`,
+    "address": locations.length > 0 ? {
+       "@type": "PostalAddress",
+       "streetAddress": locations[0].address,
+       "addressCountry": "AR"
+    } : undefined,
+    "priceRange": "$$",
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-900 selection:text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Top Navigation Bar */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-end px-6 py-4 pointer-events-none">
           <a 

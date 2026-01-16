@@ -16,11 +16,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // Verify ownership via email
   // We need to fetch the appointment -> patient -> email
-  const { data: appointment, error: fetchError } = await serviceClient
+  const { data: rawAppointment, error: fetchError } = await serviceClient!
     .from("agenda_appointments")
     .select("id, status, start_at, patient:agenda_patients(email)")
     .eq("id", appointmentId)
     .single();
+
+  const appointment = rawAppointment as any;
 
   if (fetchError || !appointment) {
     return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
@@ -35,12 +37,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   // Check timing (e.g. can't cancel if it already started? For now allow consistent with logic)
+  const now = new Date();
+  const startAt = new Date(appointment.start_at);
+  const diffInHours = (startAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+  if (diffInHours < 24) {
+      return NextResponse.json({ error: "Solo se pueden cancelar turnos con 24hs de anticipación." }, { status: 400 });
+  }
+
+  // @ts-ignore
   if (appointment.status === 'canceled') {
     return NextResponse.json({ error: "Already canceled" }, { status: 400 });
   }
 
   // Perform Cancel
-  const { error: updateError } = await serviceClient
+  const { error: updateError } = await serviceClient!
     .from("agenda_appointments")
     .update({ status: "canceled", updated_at: new Date().toISOString() })
     .eq("id", appointmentId);

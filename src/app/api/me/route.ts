@@ -37,10 +37,12 @@ export async function GET(request: NextRequest) {
 
   const metadata = (tenant?.public_metadata ?? {}) as any;
   const logoUrl = metadata?.logoUrl || null;
+  // Prefer companyDisplayName for the dashboard header if set
+  const tenantName = metadata?.companyDisplayName || tenant?.name || "Agend.ar";
 
   return NextResponse.json({
     role: agendaUser.role,
-    tenantName: tenant?.name ?? "Agend.ar",
+    tenantName,
     tenantId: agendaUser.tenant_id,
     logoUrl
   });

@@ -5,6 +5,7 @@ import { ProvidersSettings } from "@/components/settings/ProvidersSettings";
 import { requireTenantSession } from "@/server/auth";
 import { serviceClient } from "@/lib/supabase/service";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
 
 type LocationRow = Pick<
   Database["public"]["Tables"]["agenda_locations"]["Row"],
@@ -12,10 +13,21 @@ type LocationRow = Pick<
 >;
 
 export default async function ProfessionalsPage() {
-  const { supabase, tenantId } = await requireTenantSession();
+  const { supabase, session, tenantId } = await requireTenantSession();
   
   // Explicit cast to unify the client type and avoid overload errors
   const db = (serviceClient || supabase) as SupabaseClient<Database>;
+
+  // Check Permissions (Only Owner)
+  const { data: userProfile } = await db
+    .from("agenda_users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userProfile?.role !== "owner") {
+     redirect("/calendar");
+  }
 
   const { data: locations } = await db
     .from("agenda_locations")

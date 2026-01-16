@@ -24,6 +24,8 @@ function createEmptyForm() {
     color: "",
     imageUrl: "",
     categoryId: "",
+    prepaymentStrategy: "none" as "none" | "full" | "fixed",
+    prepaymentAmount: "",
   };
 }
 
@@ -47,6 +49,8 @@ type ServiceRecord = {
   active: boolean;
   sort_order: number;
   category_id: string | null;
+  prepayment_strategy: "none" | "full" | "fixed" | null;
+  prepayment_amount: number | null;
 };
 
 function formatPrice(minorUnits: number | null, currency: string) {
@@ -109,6 +113,8 @@ export function ServicesSettings() {
         color: service.color ?? "",
         imageUrl: service.image_url ?? "",
         categoryId: service.category_id ?? "",
+        prepaymentStrategy: service.prepayment_strategy ?? "none",
+        prepaymentAmount: service.prepayment_amount ? String(service.prepayment_amount / 100) : "",
       });
     } else {
       setEditingId(null);
@@ -129,6 +135,8 @@ export function ServicesSettings() {
         color: form.color.trim() ? form.color.trim() : undefined,
         imageUrl: form.imageUrl.trim() ? form.imageUrl.trim() : undefined,
         categoryId: form.categoryId.trim() ? form.categoryId : null,
+        prepaymentStrategy: form.prepaymentStrategy,
+        prepaymentAmount: form.prepaymentStrategy === "fixed" && form.prepaymentAmount ? Number(form.prepaymentAmount) : undefined,
       };
 
       const endpoint = editingId ? `/api/settings/services/${editingId}` : "/api/settings/services";
@@ -440,6 +448,83 @@ export function ServicesSettings() {
                 </div>
               </div>
             </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Estrategia de Cobro</Label>
+                <div className="grid gap-2">
+                   <div 
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-all",
+                        form.prepaymentStrategy === "none" ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 bg-white hover:border-slate-300"
+                      )}
+                      onClick={() => setForm(prev => ({ ...prev, prepaymentStrategy: "none" }))}
+                   >
+                      <div className={cn("h-4 w-4 rounded-full border flex items-center justify-center", form.prepaymentStrategy === "none" ? "border-indigo-600" : "border-slate-300")}>
+                         {form.prepaymentStrategy === "none" && <div className="h-2 w-2 rounded-full bg-indigo-600" />}
+                      </div>
+                      <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900">Pago en el consultorio</p>
+                          <p className="text-xs text-slate-500">No se requiere pago para reservar.</p>
+                      </div>
+                   </div>
+
+                   <div 
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-all",
+                        form.prepaymentStrategy === "fixed" ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 bg-white hover:border-slate-300"
+                      )}
+                      onClick={() => setForm(prev => ({ ...prev, prepaymentStrategy: "fixed" }))}
+                   >
+                      <div className={cn("h-4 w-4 rounded-full border flex items-center justify-center", form.prepaymentStrategy === "fixed" ? "border-indigo-600" : "border-slate-300")}>
+                         {form.prepaymentStrategy === "fixed" && <div className="h-2 w-2 rounded-full bg-indigo-600" />}
+                      </div>
+                      <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900">Seña / Depósito</p>
+                          <p className="text-xs text-slate-500">El paciente paga un monto fijo para confirmar.</p>
+                      </div>
+                   </div>
+
+                   <div 
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-all",
+                        form.prepaymentStrategy === "full" ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 bg-white hover:border-slate-300"
+                      )}
+                      onClick={() => setForm(prev => ({ ...prev, prepaymentStrategy: "full" }))}
+                   >
+                      <div className={cn("h-4 w-4 rounded-full border flex items-center justify-center", form.prepaymentStrategy === "full" ? "border-indigo-600" : "border-slate-300")}>
+                         {form.prepaymentStrategy === "full" && <div className="h-2 w-2 rounded-full bg-indigo-600" />}
+                      </div>
+                      <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900">Pago Total Adelantado</p>
+                          <p className="text-xs text-slate-500">Se cobra el 100% del valor al reservar.</p>
+                      </div>
+                   </div>
+                </div>
+              </div>
+
+              {form.prepaymentStrategy === "fixed" && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Monto de la Seña</Label>
+                  <div className="flex items-center rounded-lg border border-slate-200 bg-white">
+                    <span className="px-3 text-slate-400">
+                      <DollarSign className="h-4 w-4" />
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0.00"
+                      className="border-0 focus-visible:ring-0"
+                      value={form.prepaymentAmount}
+                      onChange={(e) => setForm((prev) => ({ ...prev, prepaymentAmount: e.target.value }))}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500">Monto que debe abonarse para confirmar el turno.</p>
+                </div>
+              )}
+            </div>
+
             <UploadDropzone
               label="Imagen destacada (opcional)"
               description="Arrastrá la imagen o usá la cámara. Ideal 1200x800px."
