@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     tenantId,
     count: allAppointments?.length,
-    appointments: allAppointments?.map(a => ({
+    appointments: allAppointments?.map((a: any) => ({
         id: a.id,
         start: a.start_at,
         loc: a.location_id
