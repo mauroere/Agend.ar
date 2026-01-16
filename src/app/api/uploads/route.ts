@@ -8,6 +8,8 @@ const BUCKET = process.env.NEXT_PUBLIC_UPLOAD_BUCKET ?? "public-assets";
 const ensuredBuckets = new Set<string>();
 
 async function ensureBucketExists(bucket: string) {
+  if (!serviceClient) throw new Error("Service client is not configured");
+
   if (ensuredBuckets.has(bucket)) return;
 
   const { data, error } = await serviceClient.storage.getBucket(bucket);

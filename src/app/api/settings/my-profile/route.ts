@@ -113,7 +113,7 @@ export async function PATCH(request: NextRequest) {
     // We need serviceClient or relaxed RLS to delete/insert into intersection table if strictly RLSed
     // Usually provider_services might not have RLS setup for 'staff' to edit. 
     // Safest is to use serviceClient for the relational update to avoid policy headaches
-    const adminDb = serviceClient || db; 
+    const adminDb: any = serviceClient || db; 
 
     // Delete existing
     await adminDb.from("agenda_provider_services" as any).delete().eq("provider_id", provider.id);
