@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const { data: auth } = await supabase.auth.getSession();
   const tenantId = (auth.session?.user?.app_metadata as any)?.tenant_id ?? (auth.session?.user?.user_metadata as any)?.tenant_id;
 
-  const db = serviceClient ?? supabase;
+  const db: any = serviceClient ?? supabase;
 
   // GetAll appointments for this tenant, no date filter, just limit 50 recent
   const { data: allAppointments } = await db

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   
   if (!tenantId) return NextResponse.json({ error: "No tenant" });
 
-  const db = serviceClient ?? supabase;
+  const db: any = serviceClient ?? supabase;
 
   // RAW DUMP of everything for this tenant
   const { data: all_appts } = await db
