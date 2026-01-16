@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const tenantId = (auth.session?.user?.app_metadata as any)?.tenant_id ?? 
                    (auth.session?.user?.user_metadata as any)?.tenant_id;
 
-  const db = serviceClient ?? supabase;
+  const db: any = serviceClient ?? supabase;
 
   // 1. Get raw appointments (last 30 days to next 30 days) to see what exists
   const now = new Date();
