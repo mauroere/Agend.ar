@@ -5,6 +5,7 @@ import {
 } from "@/server/whatsapp-config";
 import { processBotMessage } from "@/lib/bot/engine";
 import { serviceClient } from "@/lib/supabase/service";
+import { Json } from "@/types/database";
 
 
 function normalizePhone(phone: string) {
